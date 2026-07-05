@@ -52,12 +52,18 @@ export const submitReportHoursSchema = z.coerce
   .positive("Hours must be greater than zero.")
   .max(24, "Hours cannot exceed 24 per entry.");
 
-export const unplannedEntrySchema = z.object({
-  title: reportEntryTitleSchema,
-  description: z.string().max(2000).optional(),
-  hours: submitReportHoursSchema,
-  visibility: visibilitySchema.default("PUBLIC"),
-});
+export const unplannedEntrySchema = z
+  .object({
+    taskId: z.string().min(1).optional(),
+    title: reportEntryTitleSchema.optional(),
+    description: z.string().max(2000).optional(),
+    hours: submitReportHoursSchema,
+    visibility: visibilitySchema.default("PUBLIC"),
+  })
+  .refine((data) => data.taskId || data.title?.trim(), {
+    message: "Select a task or enter a title.",
+    path: ["title"],
+  });
 
 export const reportEntryUpdateSchema = z.object({
   description: z.string().max(2000).optional(),

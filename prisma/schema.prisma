@@ -132,9 +132,10 @@ model Task {
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  parentTask   Task?        @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  childTasks   Task[]       @relation("TaskHierarchy")
-  planItems    PlanItem[]
+  parentTask    Task?         @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  childTasks    Task[]        @relation("TaskHierarchy")
+  planItems     PlanItem[]
+  reportEntries ReportEntry[]
 
   @@index([userId, type, periodStart])
   @@index([parentTaskId])
@@ -214,6 +215,7 @@ model ReportEntry {
   id           String     @id @default(cuid())
   reportId     String
   planItemId   String?
+  taskId       String?
   taskTitleId  String?
   customTitle  String?
   description  String?
@@ -225,10 +227,12 @@ model ReportEntry {
 
   report      Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
   planItem    PlanItem?    @relation(fields: [planItemId], references: [id], onDelete: SetNull)
+  task        Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
   taskTitle   TaskTitle?   @relation(fields: [taskTitleId], references: [id], onDelete: SetNull)
   attachments Attachment[]
 
   @@index([reportId])
+  @@index([taskId])
   @@map("report_entries")
 }
 

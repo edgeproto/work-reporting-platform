@@ -6,9 +6,15 @@ import {
   type SerializedMatchingPlan,
   type SerializedReport,
 } from "@/components/reports/report-editor";
+import {
+  serializeSelectableTask,
+  type SerializedSelectableTask,
+} from "@/components/tasks/task-browser";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { requireSession } from "@/lib/auth";
+import { getReportEntryTitle } from "@/lib/reports/entry-title";
 import { getReportById, getSubmittedPlanForReport } from "@/lib/reports/queries";
+import { listSelectableTasksForReport } from "@/lib/tasks/queries";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -48,13 +54,7 @@ function serializeReport(
     entries: report.entries.map((entry) => ({
       id: entry.id,
       planItemId: entry.planItemId,
-      title:
-        entry.taskTitle?.title ??
-        entry.planItem?.task?.title ??
-        entry.planItem?.taskTitle?.title ??
-        entry.planItem?.customTitle ??
-        entry.customTitle ??
-        "Untitled",
+      title: getReportEntryTitle(entry),
       description: entry.description,
       hours: entry.hours.toString(),
       visibility: entry.visibility,
@@ -77,16 +77,27 @@ export default async function ReportEditorPage({ params }: PageProps) {
     notFound();
   }
 
-  const submittedPlan = await getSubmittedPlanForReport(
-    session.user.id,
-    session.user.organizationId,
-    report.type,
-    report.periodStart,
-  );
+  const [submittedPlan, selectableTasks] = await Promise.all([
+    getSubmittedPlanForReport(
+      session.user.id,
+      session.user.organizationId,
+      report.type,
+      report.periodStart,
+    ),
+    listSelectableTasksForReport(
+      id,
+      session.user.id,
+      session.user.organizationId,
+    ),
+  ]);
 
   const matchingPlan = submittedPlan
     ? serializeMatchingPlan(submittedPlan)
     : null;
+
+  const serializedTasks: SerializedSelectableTask[] = selectableTasks.map(
+    serializeSelectableTask,
+  );
 
   return (
     <div className="space-y-4">
@@ -96,7 +107,10 @@ export default async function ReportEditorPage({ params }: PageProps) {
       >
         ← Back to My Reports
       </Link>
-      <ReportEditor report={serializeReport(report, matchingPlan)} />
+      <ReportEditor
+        report={serializeReport(report, matchingPlan)}
+        selectableTasks={serializedTasks}
+      />
     </div>
   );
 }

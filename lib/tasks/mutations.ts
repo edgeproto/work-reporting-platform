@@ -1,7 +1,81 @@
 import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { getMonthBoundsForDate, isPeriodPast, formatDateInTz } from "@/lib/periods";
+import { getPlanItemTitle } from "@/lib/plans/item-title";
+import {
+  formatDateInTz,
+  getMonthBoundsForDate,
+  isPeriodPast,
+} from "@/lib/periods";
 import { getTaskForUser } from "@/lib/tasks/queries";
+
+export type NewReportTaskInput = {
+  title: string;
+  description?: string;
+};
+
+/** Create a user-owned task scoped to a report's period (unplanned work). */
+export async function createTaskForReport(
+  reportId: string,
+  userId: string,
+  organizationId: string,
+  input: NewReportTaskInput,
+) {
+  const report = await db.report.findFirst({
+    where: { id: reportId, userId, organizationId },
+  });
+
+  if (!report) {
+    throw new Error("Report not found.");
+  }
+
+  if (report.status === SubmissionStatus.SUBMITTED) {
+    throw new Error("Submitted reports cannot be edited.");
+  }
+
+  const title = input.title.trim();
+  if (!title) {
+    throw new Error("Task title is required.");
+  }
+
+  return db.task.create({
+    data: {
+      userId,
+      organizationId,
+      type: report.type,
+      title,
+      description: input.description?.trim() || null,
+      periodStart: report.periodStart,
+      periodEnd: report.periodEnd,
+    },
+  });
+}
+
+/** Resolve or create a task when checking off a plan item in a report. */
+export async function resolveTaskForPlanItemCheckOff(
+  reportId: string,
+  userId: string,
+  organizationId: string,
+  planItem: {
+    taskId: string | null;
+    description: string | null;
+    task?: { title: string } | null;
+    taskTitle?: { title: string } | null;
+    customTitle?: string | null;
+  },
+) {
+  if (planItem.taskId) {
+    const task = await getTaskForUser(planItem.taskId, userId, organizationId);
+    if (task) {
+      return task;
+    }
+  }
+
+  const title = getPlanItemTitle(planItem);
+  return createTaskForReport(reportId, userId, organizationId, {
+    title,
+    description: planItem.description ?? undefined,
+  });
+}
 
 export type NewPeriodTaskInput = {
   title: string;

@@ -149,18 +149,83 @@ export async function listSelectableParentTasks(
 export async function listUserTasks(
   userId: string,
   organizationId: string,
-  type?: PeriodType,
+  options: { type?: PeriodType; search?: string } = {},
 ) {
+  const { type, search } = options;
+  const normalizedSearch = search?.trim();
+
   return db.task.findMany({
     where: {
       userId,
       organizationId,
       ...(type ? { type } : {}),
+      ...(normalizedSearch
+        ? { title: { contains: normalizedSearch, mode: "insensitive" } }
+        : {}),
     },
     orderBy: [{ periodStart: "desc" }, { title: "asc" }],
     include: {
       parentTask: { select: { id: true, title: true, type: true } },
       _count: { select: { childTasks: true } },
     },
+  });
+}
+
+export type SelectableReportTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  type: PeriodType;
+  periodStart: Date;
+  periodEnd: Date;
+  parentTitle: string | null;
+  disabled: boolean;
+  disabledReason?: string;
+};
+
+/** User tasks available when adding unplanned work to a report. */
+export async function listSelectableTasksForReport(
+  reportId: string,
+  userId: string,
+  organizationId: string,
+  options: { search?: string; type?: PeriodType } = {},
+): Promise<SelectableReportTask[]> {
+  const report = await db.report.findFirst({
+    where: { id: reportId, userId, organizationId },
+    include: {
+      entries: {
+        where: { taskId: { not: null } },
+        select: { taskId: true },
+      },
+    },
+  });
+
+  if (!report) {
+    return [];
+  }
+
+  const usedTaskIds = new Set(
+    report.entries
+      .map((entry) => entry.taskId)
+      .filter((id): id is string => id !== null),
+  );
+
+  const tasks = await listUserTasks(userId, organizationId, options);
+
+  return tasks.map((task) => {
+    const alreadyOnReport = usedTaskIds.has(task.id);
+    return {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      type: task.type,
+      periodStart: task.periodStart,
+      periodEnd: task.periodEnd,
+      parentTitle: task.parentTask?.title ?? null,
+      disabled: alreadyOnReport,
+      disabledReason: alreadyOnReport
+        ? "Already on this report"
+        : undefined,
+    };
   });
 }

@@ -110,7 +110,8 @@ export async function addUnplannedEntryAction(
 ): Promise<ActionResult> {
   const session = await requireSession();
   const parsed = unplannedEntrySchema.safeParse({
-    title: formData.get("title"),
+    taskId: formData.get("taskId") || undefined,
+    title: formData.get("title") || undefined,
     description: formData.get("description") || undefined,
     hours: formData.get("hours"),
     visibility: formData.get("visibility") ?? "PUBLIC",

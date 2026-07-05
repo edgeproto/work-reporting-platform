@@ -1,16 +1,20 @@
 import { Prisma } from "@/app/generated/prisma/client";
 import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { getPlanItemTitle } from "@/lib/plans/item-title";
 import {
   clearPlanItemCompletionForReport,
   completePlanItemsFromReport,
 } from "@/lib/plans/complete-items";
 import { getPeriodBounds } from "@/lib/periods";
-import { upsertTaskTitle } from "@/lib/task-titles";
+import {
+  createTaskForReport,
+  resolveTaskForPlanItemCheckOff,
+} from "@/lib/tasks/mutations";
+import { getTaskForUser } from "@/lib/tasks/queries";
 
 export type UnplannedEntryInput = {
-  title: string;
+  taskId?: string;
+  title?: string;
   description?: string;
   hours: number;
   visibility: "PUBLIC" | "PRIVATE";
@@ -69,7 +73,7 @@ export async function checkOffPlanItem(
       },
     },
     include: {
-      task: { select: { title: true } },
+      task: { select: { id: true, title: true } },
       taskTitle: { select: { title: true } },
     },
   });
@@ -90,12 +94,11 @@ export async function checkOffPlanItem(
     return existing;
   }
 
-  const title = getPlanItemTitle(planItem);
-  const taskTitle = await upsertTaskTitle(
-    organizationId,
+  const task = await resolveTaskForPlanItemCheckOff(
+    reportId,
     userId,
-    title,
-    planItem.description,
+    organizationId,
+    planItem,
   );
 
   const maxSort = await db.reportEntry.aggregate({
@@ -107,7 +110,7 @@ export async function checkOffPlanItem(
     data: {
       reportId,
       planItemId,
-      taskTitleId: taskTitle.id,
+      taskId: task.id,
       description: planItem.description,
       hours: new Prisma.Decimal(0),
       visibility: planItem.visibility,
@@ -143,12 +146,31 @@ export async function addUnplannedEntry(
 ) {
   await assertEditableReport(reportId, userId, organizationId);
 
-  const taskTitle = await upsertTaskTitle(
-    organizationId,
-    userId,
-    input.title,
-    input.description,
-  );
+  let taskId: string;
+
+  if (input.taskId) {
+    const task = await getTaskForUser(input.taskId, userId, organizationId);
+    if (!task) {
+      throw new Error("Task not found.");
+    }
+
+    const duplicate = await db.reportEntry.findFirst({
+      where: { reportId, taskId: task.id },
+    });
+    if (duplicate) {
+      throw new Error("This task is already on the report.");
+    }
+
+    taskId = task.id;
+  } else if (input.title?.trim()) {
+    const task = await createTaskForReport(reportId, userId, organizationId, {
+      title: input.title,
+      description: input.description,
+    });
+    taskId = task.id;
+  } else {
+    throw new Error("Select a task or enter a title.");
+  }
 
   const maxSort = await db.reportEntry.aggregate({
     where: { reportId },
@@ -158,7 +180,7 @@ export async function addUnplannedEntry(
   return db.reportEntry.create({
     data: {
       reportId,
-      taskTitleId: taskTitle.id,
+      taskId,
       description: input.description?.trim() || null,
       hours: new Prisma.Decimal(input.hours),
       visibility: input.visibility,

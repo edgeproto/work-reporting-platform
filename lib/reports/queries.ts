@@ -53,6 +53,14 @@ export async function getReportById(
               customTitle: true,
             },
           },
+          task: {
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              parentTask: { select: { id: true, title: true, type: true } },
+            },
+          },
           taskTitle: { select: { id: true, title: true } },
           attachments: {
             select: {

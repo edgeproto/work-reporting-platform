@@ -32,6 +32,10 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { formatPeriodLabel, periodTypeLabel } from "@/lib/periods";
+import {
+  TaskPicker,
+  type SerializedSelectableTask,
+} from "@/components/tasks/task-browser";
 
 export type SerializedPlanItem = {
   id: string;
@@ -73,9 +77,13 @@ export type SerializedReport = {
 
 type ReportEditorProps = {
   report: SerializedReport;
+  selectableTasks?: SerializedSelectableTask[];
 };
 
-export function ReportEditor({ report }: ReportEditorProps) {
+export function ReportEditor({
+  report,
+  selectableTasks = [],
+}: ReportEditorProps) {
   const isEditable = report.status === SubmissionStatus.DRAFT;
   const periodLabel = formatPeriodLabel(
     report.type,
@@ -194,7 +202,10 @@ export function ReportEditor({ report }: ReportEditorProps) {
           {isEditable ? (
             <>
               <Separator />
-              <AddUnplannedEntryForm reportId={report.id} />
+              <AddUnplannedEntryForm
+                reportId={report.id}
+                selectableTasks={selectableTasks}
+              />
             </>
           ) : null}
         </CardContent>
@@ -481,8 +492,21 @@ function ReportEntryFields({
   );
 }
 
-function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
+const EXISTING_TASK = "existing";
+const NEW_TASK = "new";
+
+function AddUnplannedEntryForm({
+  reportId,
+  selectableTasks,
+}: {
+  reportId: string;
+  selectableTasks: SerializedSelectableTask[];
+}) {
   const router = useRouter();
+  const [mode, setMode] = useState(
+    selectableTasks.length > 0 ? EXISTING_TASK : NEW_TASK,
+  );
+  const [selectedTaskId, setSelectedTaskId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [hours, setHours] = useState("");
@@ -490,13 +514,36 @@ function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const selectedTask = selectableTasks.find((t) => t.id === selectedTaskId);
+  const isExistingTask = mode === EXISTING_TASK;
+
+  const handleModeChange = (value: string) => {
+    setMode(value);
+    setSelectedTaskId("");
+    setTitle("");
+    setDescription("");
+  };
+
+  const handleSelectTask = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    const task = selectableTasks.find((t) => t.id === taskId);
+    if (task) {
+      setDescription(task.description ?? "");
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     const formData = new FormData();
-    formData.set("title", title);
-    formData.set("description", description);
+    if (isExistingTask) {
+      formData.set("taskId", selectedTaskId);
+      formData.set("description", description);
+    } else {
+      formData.set("title", title);
+      formData.set("description", description);
+    }
     formData.set("hours", hours);
     formData.set("visibility", visibility);
 
@@ -506,6 +553,8 @@ function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
         setError(result.error);
         return;
       }
+      setMode(selectableTasks.length > 0 ? EXISTING_TASK : NEW_TASK);
+      setSelectedTaskId("");
       setTitle("");
       setDescription("");
       setHours("");
@@ -514,20 +563,50 @@ function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
     });
   };
 
+  const canSubmit = isExistingTask
+    ? selectedTaskId.length > 0 && !selectedTask?.disabled && hours
+    : title.trim().length > 0 && hours;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-sm font-medium">Add unplanned entry</p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="unplanned-title">Task title</Label>
-          <Input
-            id="unplanned-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What did you work on?"
-            required
-          />
+
+      <div className="space-y-1.5">
+        <Label htmlFor="unplanned-source">Source</Label>
+        <select
+          id="unplanned-source"
+          value={mode}
+          onChange={(e) => handleModeChange(e.target.value)}
+          className="flex h-8 w-full max-w-md rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+        >
+          <option value={EXISTING_TASK}>From My Tasks</option>
+          <option value={NEW_TASK}>New task</option>
+        </select>
+      </div>
+
+      {isExistingTask ? (
+        <TaskPicker
+          tasks={selectableTasks}
+          selectedTaskId={selectedTaskId}
+          onSelect={handleSelectTask}
+          idPrefix="unplanned"
+        />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="unplanned-title">Task title</Label>
+            <Input
+              id="unplanned-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What did you work on?"
+              required
+            />
+          </div>
         </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="unplanned-hours">Hours</Label>
           <Input
@@ -562,15 +641,12 @@ function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            placeholder="Additional details…"
+            placeholder="What did you accomplish?"
           />
         </div>
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button
-        type="submit"
-        disabled={isPending || !title.trim() || !hours}
-      >
+      <Button type="submit" disabled={isPending || !canSubmit}>
         {isPending ? "Adding…" : "Add entry"}
       </Button>
     </form>
