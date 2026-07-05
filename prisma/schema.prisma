@@ -99,6 +99,7 @@ model PasswordSetToken {
 model TaskTitle {
   id             String   @id @default(cuid())
   title          String
+  description    String?
   createdById    String
   organizationId String
   createdAt      DateTime @default(now())

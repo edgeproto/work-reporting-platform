@@ -13,3 +13,25 @@ export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Password is required."),
 });
+
+export const periodTypeSchema = z.enum(["DAILY", "WEEKLY", "MONTHLY"]);
+
+export const dateStringSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format.");
+
+export const visibilitySchema = z.enum(["PUBLIC", "PRIVATE"]);
+
+export const planItemSchema = z
+  .object({
+    taskTitleId: z.string().min(1).optional(),
+    title: z.string().trim().min(1, "Task title is required.").max(200).optional(),
+    description: z.string().max(2000).optional(),
+    visibility: visibilitySchema.default("PUBLIC"),
+  })
+  .refine((data) => data.taskTitleId || data.title, {
+    message: "Task title is required.",
+    path: ["title"],
+  });
+
+export const continuousNotesSchema = z.string().max(10000);

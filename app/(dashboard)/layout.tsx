@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Role } from "@/app/generated/prisma/enums";
+import { DashboardNav, type DashboardNavLink } from "@/components/dashboard-nav";
 import { auth, signOut } from "@/lib/auth";
 import { canManageUsers, isManagerOrAbove } from "@/lib/rbac";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,7 @@ async function signOutAction() {
   await signOut({ redirectTo: "/login" });
 }
 
-type NavLink = {
-  href: string;
-  label: string;
-};
+type NavLink = DashboardNavLink;
 
 function buildNavLinks(role: Role): NavLink[] {
   const links: NavLink[] = [
@@ -59,17 +57,7 @@ export default async function DashboardLayout({
             <Link href="/" className="font-semibold tracking-tight">
               Status Reports
             </Link>
-            <nav className="hidden items-center gap-1 sm:flex">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
+            <DashboardNav links={navLinks} />
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden text-right text-sm sm:block">
