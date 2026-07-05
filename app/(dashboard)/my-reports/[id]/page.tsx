@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
+
 import {
   ReportEditor,
   type SerializedMatchingPlan,
@@ -13,6 +15,7 @@ import {
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { requireSession } from "@/lib/auth";
 import { getReportEntryTitle } from "@/lib/reports/entry-title";
+import { prefillWeeklyMonthlyReportFromDailyEntries } from "@/lib/reports/create-draft";
 import { getReportById, getSubmittedPlanForReport } from "@/lib/reports/queries";
 import { listSelectableTasksForReport } from "@/lib/tasks/queries";
 
@@ -77,12 +80,28 @@ export default async function ReportEditorPage({ params }: PageProps) {
     notFound();
   }
 
+  const isDraftWeeklyOrMonthly =
+    report.type !== PeriodType.DAILY && report.status === SubmissionStatus.DRAFT;
+
+  if (isDraftWeeklyOrMonthly) {
+    await prefillWeeklyMonthlyReportFromDailyEntries(
+      id,
+      session.user.id,
+      session.user.organizationId,
+    );
+  }
+
+  const editorReport = isDraftWeeklyOrMonthly
+    ? ((await getReportById(id, session.user.id, session.user.organizationId)) ??
+      report)
+    : report;
+
   const [submittedPlan, selectableTasks] = await Promise.all([
     getSubmittedPlanForReport(
       session.user.id,
       session.user.organizationId,
-      report.type,
-      report.periodStart,
+      editorReport.type,
+      editorReport.periodStart,
     ),
     listSelectableTasksForReport(
       id,
@@ -108,7 +127,7 @@ export default async function ReportEditorPage({ params }: PageProps) {
         ← Back to My Reports
       </Link>
       <ReportEditor
-        report={serializeReport(report, matchingPlan)}
+        report={serializeReport(editorReport, matchingPlan)}
         selectableTasks={serializedTasks}
       />
     </div>

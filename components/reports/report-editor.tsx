@@ -104,6 +104,18 @@ export function ReportEditor({
     0,
   );
 
+  const isWeeklyOrMonthly =
+    report.type === PeriodType.WEEKLY || report.type === PeriodType.MONTHLY;
+  const entriesSectionTitle = isWeeklyOrMonthly
+    ? "Report entries"
+    : "Unplanned work";
+  const entriesSectionDescription = isWeeklyOrMonthly
+    ? "Pre-filled from your submitted daily reports in this period. Edit hours and descriptions, or add more below."
+    : "Work that was not on your plan, or entries you add directly.";
+  const emptyEntriesMessage = isWeeklyOrMonthly
+    ? "No entries yet. Submit daily reports in this period to pre-fill here, or add entries below."
+    : "No unplanned entries yet.";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -175,16 +187,12 @@ export function ReportEditor({
 
       <Card>
         <CardHeader>
-          <CardTitle>Unplanned work</CardTitle>
-          <CardDescription>
-            Work that was not on your plan, or entries you add directly.
-          </CardDescription>
+          <CardTitle>{entriesSectionTitle}</CardTitle>
+          <CardDescription>{entriesSectionDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {unplannedEntries.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No unplanned entries yet.
-            </p>
+            <p className="text-sm text-muted-foreground">{emptyEntriesMessage}</p>
           ) : (
             <ul className="space-y-4">
               {unplannedEntries.map((entry) => (

@@ -5,6 +5,7 @@ import {
   clearPlanItemCompletionForReport,
   completePlanItemsFromReport,
 } from "@/lib/plans/complete-items";
+import { prefillWeeklyMonthlyReportFromDailyEntries } from "@/lib/reports/create-draft";
 import { getPeriodBounds } from "@/lib/periods";
 import {
   createTaskForReport,
@@ -34,7 +35,7 @@ export async function createReportForPeriod(
 ) {
   const { periodStart, periodEnd } = getPeriodBounds(type, referenceDateStr);
 
-  return db.report.upsert({
+  const report = await db.report.upsert({
     where: {
       userId_type_periodStart: {
         userId,
@@ -51,6 +52,16 @@ export async function createReportForPeriod(
     },
     update: {},
   });
+
+  if (type !== PeriodType.DAILY) {
+    await prefillWeeklyMonthlyReportFromDailyEntries(
+      report.id,
+      userId,
+      organizationId,
+    );
+  }
+
+  return report;
 }
 
 export async function checkOffPlanItem(
