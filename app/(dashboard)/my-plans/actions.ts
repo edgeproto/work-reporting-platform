@@ -7,22 +7,27 @@ import { z } from "zod";
 import { PeriodType } from "@/app/generated/prisma/enums";
 import { requireSession } from "@/lib/auth";
 import {
-  addPlanItem,
   createPlanForPeriod,
   deletePlan,
   deletePlanItem,
   reopenPlan,
   submitPlan,
   updateContinuousNotes,
-  updatePlanItem,
 } from "@/lib/plans/mutations";
-import { listSelectableTaskTitles } from "@/lib/task-titles";
+import { getPlanById } from "@/lib/plans/queries";
+import {
+  createDailySubTaskForPlan,
+  createDailyTaskForPlan,
+  createMonthlyTaskForPlan,
+  createWeeklySubTaskForPlan,
+  createWeeklyTaskForPlan,
+} from "@/lib/tasks/mutations";
+import { listSelectableParentTasks } from "@/lib/tasks/queries";
 import {
   continuousNotesSchema,
   dateStringSchema,
   periodTypeSchema,
   planItemSchema,
-  visibilitySchema,
 } from "@/lib/validation";
 
 export type ActionResult = {
@@ -94,7 +99,7 @@ export async function addPlanItemAction(
 ): Promise<ActionResult> {
   const session = await requireSession();
   const parsed = planItemSchema.safeParse({
-    taskTitleId: formData.get("taskTitleId") || undefined,
+    parentTaskId: formData.get("parentTaskId") || undefined,
     title: formData.get("title") || undefined,
     description: formData.get("description") || undefined,
     visibility: formData.get("visibility") ?? "PUBLIC",
@@ -106,53 +111,70 @@ export async function addPlanItemAction(
   }
 
   try {
-    await addPlanItem(
+    const plan = await getPlanById(
       planId,
       session.user.id,
       session.user.organizationId,
-      parsed.data,
     );
+    if (!plan) {
+      return { error: "Plan not found." };
+    }
+
+    const { parentTaskId, title, description, visibility } = parsed.data;
+
+    if (plan.type === PeriodType.MONTHLY) {
+      if (!title) {
+        return { error: "Task title is required." };
+      }
+      await createMonthlyTaskForPlan(
+        planId,
+        session.user.id,
+        session.user.organizationId,
+        { title, description, visibility },
+      );
+    } else if (plan.type === PeriodType.WEEKLY) {
+      if (parentTaskId) {
+        await createWeeklySubTaskForPlan(
+          planId,
+          session.user.id,
+          session.user.organizationId,
+          { parentTaskId, visibility },
+        );
+      } else if (title) {
+        await createWeeklyTaskForPlan(
+          planId,
+          session.user.id,
+          session.user.organizationId,
+          { title, description, visibility },
+        );
+      } else {
+        return { error: "Select a monthly task or enter a new weekly task." };
+      }
+    } else if (plan.type === PeriodType.DAILY) {
+      if (parentTaskId) {
+        await createDailySubTaskForPlan(
+          planId,
+          session.user.id,
+          session.user.organizationId,
+          { parentTaskId, visibility },
+        );
+      } else if (title) {
+        await createDailyTaskForPlan(
+          planId,
+          session.user.id,
+          session.user.organizationId,
+          { title, description, visibility },
+        );
+      } else {
+        return { error: "Select a weekly task or enter a new daily task." };
+      }
+    }
+
     revalidatePath(`/my-plans/${planId}`);
     return { success: true };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to add item.",
-    };
-  }
-}
-
-const updateItemSchema = z.object({
-  itemId: z.string().min(1),
-  title: z.string().trim().min(1).max(200).optional(),
-  description: z.string().max(2000).optional(),
-  visibility: visibilitySchema.optional(),
-});
-
-export async function updatePlanItemAction(
-  planId: string,
-  input: z.infer<typeof updateItemSchema>,
-): Promise<ActionResult> {
-  const session = await requireSession();
-  const parsed = updateItemSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return { error: "Invalid input." };
-  }
-
-  const { itemId, ...data } = parsed.data;
-
-  try {
-    await updatePlanItem(
-      itemId,
-      session.user.id,
-      session.user.organizationId,
-      data,
-    );
-    revalidatePath(`/my-plans/${planId}`);
-    return { success: true };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to update item.",
     };
   }
 }
@@ -234,11 +256,11 @@ export async function deletePlanAction(planId: string): Promise<ActionResult> {
   }
 }
 
-export async function listSelectableTaskTitlesAction(planId: string) {
+export async function listSelectableParentTasksAction(planId: string) {
   const session = await requireSession();
-  return listSelectableTaskTitles(
-    session.user.organizationId,
-    session.user.id,
+  return listSelectableParentTasks(
     planId,
+    session.user.id,
+    session.user.organizationId,
   );
 }

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Trash2 } from "lucide-react";
 
-import { SubmissionStatus } from "@/app/generated/prisma/enums";
+import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
 import {
   addPlanItemAction,
   deletePlanItemAction,
@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { formatPeriodLabel, periodTypeLabel } from "@/lib/periods";
+import type { SelectableParentTask } from "@/lib/tasks/queries";
 
 export type SerializedPlanItem = {
   id: string;
@@ -34,37 +35,41 @@ export type SerializedPlanItem = {
   description: string | null;
   visibility: "PUBLIC" | "PRIVATE";
   completedAt: string | null;
+  taskType: PeriodType | null;
+  parentTitle: string | null;
 };
 
 export type SerializedPlan = {
   id: string;
-  type: "DAILY" | "WEEKLY" | "MONTHLY";
+  type: PeriodType;
   periodStart: string;
   periodEnd: string;
   status: SubmissionStatus;
   submittedAt: string | null;
+  periodPassed: boolean;
   items: SerializedPlanItem[];
-};
-
-export type SelectableTask = {
-  id: string;
-  title: string;
-  description: string | null;
 };
 
 type PlanEditorProps = {
   plan: SerializedPlan;
-  selectableTasks?: SelectableTask[];
+  selectableParents?: SelectableParentTask[];
 };
 
-export function PlanEditor({ plan, selectableTasks = [] }: PlanEditorProps) {
+export function PlanEditor({ plan, selectableParents = [] }: PlanEditorProps) {
   const router = useRouter();
-  const isEditable = plan.status === SubmissionStatus.DRAFT;
+  const isEditable = plan.status === SubmissionStatus.DRAFT && !plan.periodPassed;
   const periodLabel = formatPeriodLabel(
     plan.type,
     new Date(plan.periodStart),
     new Date(plan.periodEnd),
   );
+
+  const addTaskDescription =
+    plan.type === PeriodType.MONTHLY
+      ? "Create monthly tasks for this plan. Tasks are private to you."
+      : plan.type === PeriodType.WEEKLY
+        ? "Add weekly tasks directly, or create sub-tasks from your monthly tasks for this month."
+        : "Add daily tasks directly, or create sub-tasks from your weekly tasks for this week.";
 
   return (
     <div className="space-y-6">
@@ -81,12 +86,16 @@ export function PlanEditor({ plan, selectableTasks = [] }: PlanEditorProps) {
         </div>
       </div>
 
+      {plan.periodPassed ? (
+        <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+          This {plan.type.toLowerCase()} period has passed — tasks can no longer be added.
+        </p>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Planned tasks</CardTitle>
-          <CardDescription>
-            Discrete tasks you intend to work on during this period.
-          </CardDescription>
+          <CardDescription>{addTaskDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {plan.items.length === 0 ? (
@@ -107,7 +116,11 @@ export function PlanEditor({ plan, selectableTasks = [] }: PlanEditorProps) {
           )}
 
           {isEditable ? (
-            <AddPlanItemForm planId={plan.id} selectableTasks={selectableTasks} />
+            <AddPlanItemForm
+              planId={plan.id}
+              planType={plan.type}
+              selectableParents={selectableParents}
+            />
           ) : null}
         </CardContent>
       </Card>
@@ -146,11 +159,22 @@ function PlanItemRow({
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{item.title}</span>
+          {item.taskType ? (
+            <span className="text-xs text-muted-foreground capitalize">
+              {item.taskType.toLowerCase()}
+            </span>
+          ) : null}
           <VisibilityBadge visibility={item.visibility} />
           {item.completedAt ? (
             <span className="text-xs text-muted-foreground">Completed</span>
           ) : null}
         </div>
+        {item.parentTitle ? (
+          <p className="text-xs text-muted-foreground">
+            From {item.taskType === PeriodType.DAILY ? "weekly" : "monthly"} task:{" "}
+            {item.parentTitle}
+          </p>
+        ) : null}
         {item.description ? (
           <p className="text-sm text-muted-foreground">{item.description}</p>
         ) : null}
@@ -176,32 +200,39 @@ const NEW_TASK = "__new__";
 
 function AddPlanItemForm({
   planId,
-  selectableTasks = [],
+  planType,
+  selectableParents,
 }: {
   planId: string;
-  selectableTasks?: SelectableTask[];
+  planType: PeriodType;
+  selectableParents: SelectableParentTask[];
 }) {
   const router = useRouter();
-  const [selectedId, setSelectedId] = useState(NEW_TASK);
+  const [mode, setMode] = useState(NEW_TASK);
+  const [selectedParentId, setSelectedParentId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const isNewTask = selectedId === NEW_TASK;
+  const isMonthly = planType === PeriodType.MONTHLY;
+  const isNewTask = isMonthly || mode === NEW_TASK;
+  const selectedParent = selectableParents.find((t) => t.id === selectedParentId);
 
-  const handleSelectChange = (value: string) => {
-    setSelectedId(value);
-    if (value === NEW_TASK) {
-      setTitle("");
-      setDescription("");
-      return;
-    }
-    const task = selectableTasks.find((t) => t.id === value);
-    if (task) {
-      setTitle(task.title);
-      setDescription(task.description ?? "");
+  const handleModeChange = (value: string) => {
+    setMode(value);
+    setSelectedParentId("");
+    setTitle("");
+    setDescription("");
+  };
+
+  const handleParentChange = (value: string) => {
+    setSelectedParentId(value);
+    const parent = selectableParents.find((t) => t.id === value);
+    if (parent) {
+      setTitle(parent.title);
+      setDescription(parent.description ?? "");
     }
   };
 
@@ -212,10 +243,10 @@ function AddPlanItemForm({
     const formData = new FormData();
     if (isNewTask) {
       formData.set("title", title);
+      formData.set("description", description);
     } else {
-      formData.set("taskTitleId", selectedId);
+      formData.set("parentTaskId", selectedParentId);
     }
-    formData.set("description", description);
     formData.set("visibility", visibility);
 
     startTransition(async () => {
@@ -224,7 +255,8 @@ function AddPlanItemForm({
         setError(result.error);
         return;
       }
-      setSelectedId(NEW_TASK);
+      setMode(NEW_TASK);
+      setSelectedParentId("");
       setTitle("");
       setDescription("");
       setVisibility("PUBLIC");
@@ -232,80 +264,126 @@ function AddPlanItemForm({
     });
   };
 
-  const canSubmit = isNewTask ? title.trim().length > 0 : selectedId !== NEW_TASK;
+  const canSubmit = isNewTask
+    ? title.trim().length > 0
+    : selectedParentId.length > 0 && !selectedParent?.disabled;
+
+  const periodLabel =
+    planType === PeriodType.WEEKLY
+      ? "weekly"
+      : planType === PeriodType.DAILY
+        ? "daily"
+        : "monthly";
 
   return (
     <>
       <Separator />
       <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm font-medium">Add planned task</p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="item-select">Select task</Label>
-            <select
-              id="item-select"
-              value={selectedId}
-              onChange={(e) => handleSelectChange(e.target.value)}
-              className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-            >
-              <option value={NEW_TASK}>— New task —</option>
-              {selectableTasks.map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.title}
-                </option>
-              ))}
-            </select>
-            {selectableTasks.length === 0 && isNewTask ? (
-              <p className="text-xs text-muted-foreground">
-                No saved tasks yet. Create one below — it will appear in this list next time.
-              </p>
-            ) : null}
-          </div>
+        <p className="text-sm font-medium">Add {periodLabel} task</p>
 
-          {isNewTask ? (
+        {!isMonthly ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="task-mode">Source</Label>
+            <select
+              id="task-mode"
+              value={mode}
+              onChange={(e) => handleModeChange(e.target.value)}
+              className="flex h-8 w-full max-w-md rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+            >
+              <option value={NEW_TASK}>New independent task</option>
+              <option value="parent">
+                {planType === PeriodType.WEEKLY
+                  ? "Sub-task from monthly task"
+                  : "Sub-task from weekly task"}
+              </option>
+            </select>
+          </div>
+        ) : null}
+
+        {isNewTask ? (
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="item-title">Task title</Label>
               <Input
                 id="item-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="What do you plan to work on?"
+                placeholder={`What do you plan to work on?`}
                 required
               />
             </div>
-          ) : (
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Task title</Label>
-              <p className="text-sm font-medium">{title}</p>
+              <Label htmlFor="item-description">Description</Label>
+              <Textarea
+                id="item-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                placeholder="Additional context…"
+              />
             </div>
-          )}
-
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="item-description">Description</Label>
-            <Textarea
-              id="item-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Additional context for this task…"
-            />
           </div>
+        ) : (
+          <div className="grid gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="parent-select">
+                {planType === PeriodType.WEEKLY
+                  ? "Monthly task"
+                  : "Weekly task"}
+              </Label>
+              <select
+                id="parent-select"
+                value={selectedParentId}
+                onChange={(e) => handleParentChange(e.target.value)}
+                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                required
+              >
+                <option value="">— Select —</option>
+                {selectableParents.map((task) => (
+                  <option key={task.id} value={task.id} disabled={task.disabled}>
+                    {task.title}
+                    {task.disabled && task.disabledReason
+                      ? ` (${task.disabledReason})`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="item-visibility">Visibility</Label>
-            <select
-              id="item-visibility"
-              value={visibility}
-              onChange={(e) =>
-                setVisibility(e.target.value as "PUBLIC" | "PRIVATE")
-              }
-              className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-            >
-              <option value="PUBLIC">Public — visible to teammates</option>
-              <option value="PRIVATE">Private — managers only</option>
-            </select>
+            {selectedParent ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Task title</Label>
+                  <p className="text-sm font-medium">{selectedParent.title}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Description (from parent)</Label>
+                  <p className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                    {selectedParent.description?.trim()
+                      ? selectedParent.description
+                      : "No description"}
+                  </p>
+                </div>
+              </>
+            ) : null}
           </div>
+        )}
+
+        <div className="space-y-1.5 sm:max-w-xs">
+          <Label htmlFor="item-visibility">Visibility</Label>
+          <select
+            id="item-visibility"
+            value={visibility}
+            onChange={(e) =>
+              setVisibility(e.target.value as "PUBLIC" | "PRIVATE")
+            }
+            className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          >
+            <option value="PUBLIC">Public — visible to teammates</option>
+            <option value="PRIVATE">Private — managers only</option>
+          </select>
         </div>
+
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button type="submit" disabled={isPending || !canSubmit}>
           {isPending ? "Adding…" : "Add task"}

@@ -7,7 +7,8 @@ import {
 } from "@/components/plans/plan-editor";
 import { requireSession } from "@/lib/auth";
 import { getPlanById } from "@/lib/plans/queries";
-import { listSelectableTaskTitles } from "@/lib/task-titles";
+import { isPeriodPast } from "@/lib/periods";
+import { listSelectableParentTasks } from "@/lib/tasks/queries";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -23,12 +24,19 @@ function serializePlan(
     periodEnd: plan.periodEnd.toISOString(),
     status: plan.status,
     submittedAt: plan.submittedAt?.toISOString() ?? null,
+    periodPassed: isPeriodPast(plan.periodEnd),
     items: plan.items.map((item) => ({
       id: item.id,
-      title: item.taskTitle?.title ?? item.customTitle ?? "Untitled",
+      title:
+        item.task?.title ??
+        item.taskTitle?.title ??
+        item.customTitle ??
+        "Untitled",
       description: item.description,
       visibility: item.visibility,
       completedAt: item.completedAt?.toISOString() ?? null,
+      taskType: item.task?.type ?? null,
+      parentTitle: item.task?.parentTask?.title ?? null,
     })),
   };
 }
@@ -47,10 +55,10 @@ export default async function PlanEditorPage({ params }: PageProps) {
     notFound();
   }
 
-  const selectableTasks = await listSelectableTaskTitles(
-    session.user.organizationId,
-    session.user.id,
+  const selectableParents = await listSelectableParentTasks(
     plan.id,
+    session.user.id,
+    session.user.organizationId,
   );
 
   return (
@@ -61,7 +69,10 @@ export default async function PlanEditorPage({ params }: PageProps) {
       >
         ← Back to My Plans
       </Link>
-      <PlanEditor plan={serializePlan(plan)} selectableTasks={selectableTasks} />
+      <PlanEditor
+        plan={serializePlan(plan)}
+        selectableParents={selectableParents}
+      />
     </div>
   );
 }

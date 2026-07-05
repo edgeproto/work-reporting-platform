@@ -24,14 +24,14 @@ export const visibilitySchema = z.enum(["PUBLIC", "PRIVATE"]);
 
 export const planItemSchema = z
   .object({
-    taskTitleId: z.string().min(1).optional(),
+    parentTaskId: z.string().min(1).optional(),
     title: z.string().trim().min(1, "Task title is required.").max(200).optional(),
     description: z.string().max(2000).optional(),
     visibility: visibilitySchema.default("PUBLIC"),
   })
-  .refine((data) => data.taskTitleId || data.title, {
-    message: "Task title is required.",
-    path: ["title"],
-  });
+  .refine(
+    (data) => data.parentTaskId || data.title,
+    { message: "Select a parent task or enter a title.", path: ["title"] },
+  );
 
 export const continuousNotesSchema = z.string().max(10000);

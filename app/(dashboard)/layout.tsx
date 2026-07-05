@@ -19,7 +19,7 @@ function buildNavLinks(role: Role): NavLink[] {
     { href: "/", label: "Home" },
     { href: "/my-plans", label: "My Plans" },
     { href: "/my-reports", label: "My Reports" },
-    { href: "/tasks", label: "Task Catalog" },
+    { href: "/tasks", label: "My Tasks" },
   ];
 
   if (isManagerOrAbove({ role })) {

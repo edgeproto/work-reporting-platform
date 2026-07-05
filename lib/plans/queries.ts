@@ -44,6 +44,16 @@ export async function getPlanById(
       items: {
         orderBy: { sortOrder: "asc" },
         include: {
+          task: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              type: true,
+              parentTaskId: true,
+              parentTask: { select: { id: true, title: true, type: true } },
+            },
+          },
           taskTitle: { select: { id: true, title: true } },
         },
       },
@@ -69,6 +79,16 @@ export async function getPlanForPeriod(
       items: {
         orderBy: { sortOrder: "asc" },
         include: {
+          task: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              type: true,
+              parentTaskId: true,
+              parentTask: { select: { id: true, title: true, type: true } },
+            },
+          },
           taskTitle: { select: { id: true, title: true } },
         },
       },
