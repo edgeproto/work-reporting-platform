@@ -1,0 +1,44 @@
+# Development stack: Postgres + Next.js app with hot reload and uploads volume.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: reports
+      POSTGRES_PASSWORD: reports
+      POSTGRES_DB: reports
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reports -d reports"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      target: development
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://reports:reports@db:5432/reports
+      UPLOAD_DIR: /data/uploads
+      APP_URL: http://localhost:3000
+      SINGLE_TENANT_MODE: "true"
+      TZ: UTC
+    volumes:
+      - .:/app
+      - app_node_modules:/app/node_modules
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  app_node_modules:
+  uploads:

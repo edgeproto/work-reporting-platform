@@ -1,0 +1,231 @@
+// Status Reporting Platform — org-scoped multi-tenant schema (v1 single-org, SaaS-ready)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+enum PeriodType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum SubscriptionPlan {
+  FREE
+  TEAM
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  taskTitles    TaskTitle[]
+  plans         Plan[]
+  reports       Report[]
+  subscription  Subscription?
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String
+  name           String
+  role           Role     @default(MEMBER)
+  organizationId String
+  passwordHash   String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  passwordSetTokens PasswordSetToken[]
+  createdTaskTitles TaskTitle[]        @relation("TaskTitleCreatedBy")
+  plans             Plan[]
+  reports           Report[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@map("users")
+}
+
+model PasswordSetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_set_tokens")
+}
+
+model TaskTitle {
+  id             String   @id @default(cuid())
+  title          String
+  createdById    String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  createdBy    User          @relation("TaskTitleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planItems    PlanItem[]
+  reportEntries ReportEntry[]
+
+  @@unique([organizationId, title])
+  @@index([organizationId])
+  @@map("task_titles")
+}
+
+model Plan {
+  id               String           @id @default(cuid())
+  userId           String
+  organizationId   String
+  type             PeriodType
+  periodStart      DateTime         @db.Date
+  periodEnd        DateTime         @db.Date
+  continuousNotes  String           @default("")
+  status           SubmissionStatus @default(DRAFT)
+  submittedAt      DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        PlanItem[]
+
+  @@unique([userId, type, periodStart])
+  @@index([organizationId, periodStart])
+  @@index([userId, status])
+  @@map("plans")
+}
+
+model PlanItem {
+  id                  String     @id @default(cuid())
+  planId              String
+  taskTitleId         String?
+  customTitle         String?
+  description         String?
+  visibility          Visibility @default(PUBLIC)
+  sortOrder           Int        @default(0)
+  completedAt         DateTime?
+  completedInReportId String?
+
+  plan              Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+  taskTitle         TaskTitle?    @relation(fields: [taskTitleId], references: [id], onDelete: SetNull)
+  completedInReport Report?       @relation(fields: [completedInReportId], references: [id], onDelete: SetNull)
+  reportEntries     ReportEntry[]
+
+  @@index([planId])
+  @@map("plan_items")
+}
+
+model Report {
+  id             String           @id @default(cuid())
+  userId         String
+  organizationId String
+  type           PeriodType
+  periodStart    DateTime         @db.Date
+  periodEnd      DateTime         @db.Date
+  status         SubmissionStatus @default(DRAFT)
+  submittedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entries           ReportEntry[]
+  completedPlanItems PlanItem[]
+
+  @@unique([userId, type, periodStart])
+  @@index([organizationId, periodStart])
+  @@index([userId, status])
+  @@map("reports")
+}
+
+model ReportEntry {
+  id           String     @id @default(cuid())
+  reportId     String
+  planItemId   String?
+  taskTitleId  String?
+  customTitle  String?
+  description  String?
+  hours        Decimal    @db.Decimal(5, 2)
+  visibility   Visibility @default(PUBLIC)
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  report      Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  planItem    PlanItem?    @relation(fields: [planItemId], references: [id], onDelete: SetNull)
+  taskTitle   TaskTitle?   @relation(fields: [taskTitleId], references: [id], onDelete: SetNull)
+  attachments Attachment[]
+
+  @@index([reportId])
+  @@map("report_entries")
+}
+
+model Attachment {
+  id            String @id @default(cuid())
+  reportEntryId String
+  fileName      String
+  storageKey    String
+  mimeType      String
+  sizeBytes     Int
+  createdAt     DateTime @default(now())
+
+  reportEntry ReportEntry @relation(fields: [reportEntryId], references: [id], onDelete: Cascade)
+
+  @@index([reportEntryId])
+  @@map("attachments")
+}
+
+/// Placeholder for future SaaS billing — unused in v1.
+model Subscription {
+  id             String             @id @default(cuid())
+  organizationId String             @unique
+  plan           SubscriptionPlan   @default(FREE)
+  status         SubscriptionStatus @default(ACTIVE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
