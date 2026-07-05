@@ -18,10 +18,4 @@ export function canManageUsers(user: RoleHolder): boolean {
   return isAdmin(user);
 }
 
-export function canViewPrivate(viewer: RoleHolder, ownerId: string, viewerId: string): boolean {
-  if (viewerId === ownerId) {
-    return true;
-  }
-
-  return isManagerOrAbove(viewer);
-}
+export { canViewPrivate } from "@/lib/visibility";
