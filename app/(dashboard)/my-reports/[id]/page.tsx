@@ -11,7 +11,7 @@ import {
 import {
   serializeSelectableTask,
   type SerializedSelectableTask,
-} from "@/components/tasks/task-browser";
+} from "@/lib/tasks/serialize";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { requireSession } from "@/lib/auth";
 import { getReportEntryTitle } from "@/lib/reports/entry-title";

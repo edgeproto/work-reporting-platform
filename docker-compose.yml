@@ -1,4 +1,6 @@
 # Development stack: Postgres + Next.js app with hot reload and uploads volume.
+# App binds to 0.0.0.0 inside the container (see Dockerfile HOSTNAME).
+# Teammates on the LAN can use http://<host-ip>:3000 when firewall allows.
 services:
   db:
     image: postgres:16-alpine
@@ -28,6 +30,7 @@ services:
       DATABASE_URL: postgresql://reports:reports@db:5432/reports
       UPLOAD_DIR: /data/uploads
       APP_URL: http://localhost:3000
+      AUTH_SECRET: ${AUTH_SECRET:-dev-secret-change-me}
       SINGLE_TENANT_MODE: "true"
       TZ: UTC
     volumes:
