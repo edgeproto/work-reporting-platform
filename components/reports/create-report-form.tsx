@@ -3,7 +3,10 @@
 import { useActionState, useState } from "react";
 
 import { PeriodType } from "@/app/generated/prisma/enums";
-import { createPlanAction, type ActionResult } from "@/app/(dashboard)/my-plans/actions";
+import {
+  createReportAction,
+  type ActionResult,
+} from "@/app/(dashboard)/my-reports/actions";
 import { WeekPicker } from "@/components/plans/week-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +19,7 @@ import {
   pickerValueFromReferenceDate,
 } from "@/lib/periods";
 
-type CreatePlanFormProps = {
+type CreateReportFormProps = {
   defaultType: PeriodType;
   defaultDate: string;
 };
@@ -28,13 +31,16 @@ function referenceDateForType(type: PeriodType, pickerValue: string): string {
   return pickerValue;
 }
 
-export function CreatePlanForm({ defaultType, defaultDate }: CreatePlanFormProps) {
+export function CreateReportForm({
+  defaultType,
+  defaultDate,
+}: CreateReportFormProps) {
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
-    createPlanAction,
+    createReportAction,
     {},
   );
 
-  const [planType, setPlanType] = useState(defaultType);
+  const [reportType, setReportType] = useState(defaultType);
   const [referenceDate, setReferenceDate] = useState(() =>
     referenceDateForType(
       defaultType,
@@ -47,14 +53,14 @@ export function CreatePlanForm({ defaultType, defaultDate }: CreatePlanFormProps
 
   const handleTypeChange = (type: PeriodType) => {
     const nextPickerValue = pickerValueFromReferenceDate(type, referenceDate);
-    setPlanType(type);
+    setReportType(type);
     setPickerValue(nextPickerValue);
     setReferenceDate(referenceDateForType(type, nextPickerValue));
   };
 
   const handlePickerChange = (value: string) => {
     setPickerValue(value);
-    setReferenceDate(referenceDateForType(planType, value));
+    setReferenceDate(referenceDateForType(reportType, value));
   };
 
   const handleWeekChange = (sunday: string) => {
@@ -62,19 +68,19 @@ export function CreatePlanForm({ defaultType, defaultDate }: CreatePlanFormProps
     setReferenceDate(sunday);
   };
 
-  const preview = formatPeriodPreview(planType, referenceDate);
+  const preview = formatPeriodPreview(reportType, referenceDate);
 
   return (
     <form action={formAction}>
-      <input type="hidden" name="type" value={planType} />
+      <input type="hidden" name="type" value={reportType} />
       <input type="hidden" name="date" value={referenceDate} />
 
       <div className="flex flex-nowrap items-end gap-3">
         <div className="shrink-0 space-y-1.5">
-          <Label htmlFor="plan-type">Type</Label>
+          <Label htmlFor="report-type">Type</Label>
           <select
-            id="plan-type"
-            value={planType}
+            id="report-type"
+            value={reportType}
             onChange={(e) => handleTypeChange(e.target.value as PeriodType)}
             className="flex h-8 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
           >
@@ -86,18 +92,18 @@ export function CreatePlanForm({ defaultType, defaultDate }: CreatePlanFormProps
           </select>
         </div>
 
-        {planType === PeriodType.WEEKLY ? (
+        {reportType === PeriodType.WEEKLY ? (
           <WeekPicker
-            id="plan-period"
+            id="report-period"
             value={pickerValue}
             onChange={handleWeekChange}
           />
         ) : (
           <div className="shrink-0 space-y-1.5">
-            <Label htmlFor="plan-period">{periodPickerLabel(planType)}</Label>
+            <Label htmlFor="report-period">{periodPickerLabel(reportType)}</Label>
             <Input
-              id="plan-period"
-              type={planType === PeriodType.MONTHLY ? "month" : "date"}
+              id="report-period"
+              type={reportType === PeriodType.MONTHLY ? "month" : "date"}
               value={pickerValue}
               onChange={(e) => handlePickerChange(e.target.value)}
               className="w-36"
@@ -115,7 +121,7 @@ export function CreatePlanForm({ defaultType, defaultDate }: CreatePlanFormProps
         )}
 
         <Button type="submit" className="shrink-0" disabled={pending}>
-          {pending ? "Creating…" : "New plan"}
+          {pending ? "Creating…" : "New report"}
         </Button>
       </div>
 

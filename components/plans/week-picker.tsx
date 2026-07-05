@@ -33,9 +33,7 @@ export function WeekPicker({ id, value, onChange }: WeekPickerProps) {
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="space-y-1.5">
-        <Label htmlFor={id ? `${id}-month` : "week-month"} className="sr-only">
-          Month
-        </Label>
+        <Label htmlFor={id ? `${id}-month` : "week-month"}>Month</Label>
         <Input
           id={id ? `${id}-month` : "week-month"}
           type="month"
@@ -46,9 +44,7 @@ export function WeekPicker({ id, value, onChange }: WeekPickerProps) {
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor={id ? `${id}-week` : "week-select"} className="sr-only">
-          Week
-        </Label>
+        <Label htmlFor={id ? `${id}-week` : "week-select"}>Week</Label>
         <select
           id={id ? `${id}-week` : "week-select"}
           value={weeks.some((w) => w.sunday === value) ? value : weeks[0]?.sunday ?? ""}

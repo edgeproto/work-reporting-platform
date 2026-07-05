@@ -35,3 +35,32 @@ export const planItemSchema = z
   );
 
 export const continuousNotesSchema = z.string().max(10000);
+
+export const reportEntryTitleSchema = z
+  .string()
+  .trim()
+  .min(1, "Task title is required.")
+  .max(200);
+
+export const reportHoursSchema = z.coerce
+  .number()
+  .min(0, "Hours cannot be negative.")
+  .max(24, "Hours cannot exceed 24 per entry.");
+
+export const submitReportHoursSchema = z.coerce
+  .number()
+  .positive("Hours must be greater than zero.")
+  .max(24, "Hours cannot exceed 24 per entry.");
+
+export const unplannedEntrySchema = z.object({
+  title: reportEntryTitleSchema,
+  description: z.string().max(2000).optional(),
+  hours: submitReportHoursSchema,
+  visibility: visibilitySchema.default("PUBLIC"),
+});
+
+export const reportEntryUpdateSchema = z.object({
+  description: z.string().max(2000).optional(),
+  hours: reportHoursSchema,
+  visibility: visibilitySchema.default("PUBLIC"),
+});
