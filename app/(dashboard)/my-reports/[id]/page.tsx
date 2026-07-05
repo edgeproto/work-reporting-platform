@@ -61,7 +61,12 @@ function serializeReport(
       description: entry.description,
       hours: entry.hours.toString(),
       visibility: entry.visibility,
-      attachmentCount: entry.attachments.length,
+      attachments: entry.attachments.map((attachment) => ({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+      })),
     })),
   };
 }

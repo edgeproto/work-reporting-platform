@@ -17,6 +17,10 @@ import {
   updateReportEntry,
 } from "@/lib/reports/mutations";
 import {
+  addAttachment,
+  deleteAttachment,
+} from "@/lib/reports/attachments";
+import {
   dateStringSchema,
   periodTypeSchema,
   reportEntryUpdateSchema,
@@ -228,6 +232,57 @@ export async function deleteReportAction(reportId: string): Promise<ActionResult
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to delete report.",
+    };
+  }
+}
+
+export async function uploadAttachmentAction(
+  reportId: string,
+  entryId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  const file = formData.get("file");
+
+  if (!(file instanceof File)) {
+    return { error: "No file selected." };
+  }
+
+  try {
+    await addAttachment(
+      reportId,
+      entryId,
+      session.user.id,
+      session.user.organizationId,
+      file,
+    );
+    revalidatePath(`/my-reports/${reportId}`);
+    return { success: true };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to upload file.",
+    };
+  }
+}
+
+export async function deleteAttachmentAction(
+  reportId: string,
+  attachmentId: string,
+): Promise<ActionResult> {
+  const session = await requireSession();
+
+  try {
+    await deleteAttachment(
+      attachmentId,
+      reportId,
+      session.user.id,
+      session.user.organizationId,
+    );
+    revalidatePath(`/my-reports/${reportId}`);
+    return { success: true };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to delete attachment.",
     };
   }
 }

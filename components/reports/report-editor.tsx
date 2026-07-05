@@ -2,16 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Lock, Trash2 } from "lucide-react";
+import { Check, Lock, Paperclip, Trash2, Upload, X } from "lucide-react";
 
 import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
 import {
   addUnplannedEntryAction,
   checkOffPlanItemAction,
+  deleteAttachmentAction,
   deleteReportEntryAction,
   submitReportAction,
   uncheckPlanItemAction,
   updateReportEntryAction,
+  uploadAttachmentAction,
 } from "@/app/(dashboard)/my-reports/actions";
 import { DeleteReportButton } from "@/components/reports/delete-report-button";
 import {
@@ -48,6 +50,13 @@ export type SerializedPlanItem = {
   parentTitle: string | null;
 };
 
+export type SerializedAttachment = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
 export type SerializedReportEntry = {
   id: string;
   planItemId: string | null;
@@ -55,7 +64,7 @@ export type SerializedReportEntry = {
   description: string | null;
   hours: string;
   visibility: "PUBLIC" | "PRIVATE";
-  attachmentCount: number;
+  attachments: SerializedAttachment[];
 };
 
 export type SerializedMatchingPlan = {
@@ -357,12 +366,6 @@ function ReportEntryCard({
             <span className="font-medium">{entry.title}</span>
             <VisibilityBadge visibility={entry.visibility} />
           </div>
-          {entry.attachmentCount > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {entry.attachmentCount} attachment
-              {entry.attachmentCount === 1 ? "" : "s"}
-            </p>
-          ) : null}
         </div>
         {!readOnly && allowDelete ? (
           <Button
@@ -426,21 +429,30 @@ function ReportEntryFields({
 
   if (readOnly) {
     return (
-      <div className="grid gap-2 text-sm sm:grid-cols-[auto_1fr]">
-        <span className="text-muted-foreground">Hours</span>
-        <span>{Number(entry.hours).toFixed(1)}</span>
-        {entry.description ? (
-          <>
-            <span className="text-muted-foreground">Description</span>
-            <span className="whitespace-pre-wrap">{entry.description}</span>
-          </>
-        ) : null}
+      <div className="space-y-3">
+        <div className="grid gap-2 text-sm sm:grid-cols-[auto_1fr]">
+          <span className="text-muted-foreground">Hours</span>
+          <span>{Number(entry.hours).toFixed(1)}</span>
+          {entry.description ? (
+            <>
+              <span className="text-muted-foreground">Description</span>
+              <span className="whitespace-pre-wrap">{entry.description}</span>
+            </>
+          ) : null}
+        </div>
+        <EntryAttachments
+          reportId={reportId}
+          entryId={entry.id}
+          attachments={entry.attachments}
+          readOnly
+        />
       </div>
     );
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
         <Label htmlFor={`hours-${entry.id}`}>Hours</Label>
         <Input
@@ -496,6 +508,143 @@ function ReportEntryFields({
       ) : saved ? (
         <p className="text-xs text-muted-foreground sm:col-span-2">Saved</p>
       ) : null}
+      </div>
+      <EntryAttachments
+        reportId={reportId}
+        entryId={entry.id}
+        attachments={entry.attachments}
+        readOnly={false}
+      />
+    </div>
+  );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function EntryAttachments({
+  reportId,
+  entryId,
+  attachments,
+  readOnly,
+}: {
+  reportId: string;
+  entryId: string;
+  attachments: SerializedAttachment[];
+  readOnly: boolean;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setError(null);
+    const formData = new FormData();
+    formData.set("file", file);
+
+    startTransition(async () => {
+      const result = await uploadAttachmentAction(reportId, entryId, formData);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  const handleDelete = (attachmentId: string) => {
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteAttachmentAction(reportId, attachmentId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Paperclip className="size-3.5" />
+        Attachments
+      </div>
+
+      {attachments.length > 0 ? (
+        <ul className="space-y-1">
+          {attachments.map((attachment) => (
+            <li
+              key={attachment.id}
+              className="flex items-center justify-between gap-2 rounded-md border bg-muted/20 px-2.5 py-1.5 text-sm"
+            >
+              <a
+                href={`/api/attachments/${attachment.id}`}
+                className="flex min-w-0 flex-1 items-center gap-2 hover:underline"
+                download={attachment.fileName}
+              >
+                <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{attachment.fileName}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {formatFileSize(attachment.sizeBytes)}
+                </span>
+              </a>
+              {!readOnly ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => handleDelete(attachment.id)}
+                  disabled={isPending}
+                  aria-label={`Remove ${attachment.fileName}`}
+                >
+                  <X />
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted-foreground">No attachments.</p>
+      )}
+
+      {!readOnly ? (
+        <div>
+          <Label
+            htmlFor={`upload-${entryId}`}
+            className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-normal text-primary hover:underline"
+          >
+            <Upload className="size-3.5" />
+            {isPending ? "Uploading…" : "Upload file"}
+          </Label>
+          <input
+            id={`upload-${entryId}`}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+            onChange={handleUpload}
+            disabled={isPending}
+            className="sr-only"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            PDF, images, Office docs, or plain text. Max 10 MB.
+          </p>
+        </div>
+      ) : null}
+
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }

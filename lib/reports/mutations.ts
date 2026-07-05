@@ -11,6 +11,10 @@ import {
   createTaskForReport,
   resolveTaskForPlanItemCheckOff,
 } from "@/lib/tasks/mutations";
+import {
+  deleteAttachmentsForReport,
+  deleteAttachmentsForReportEntry,
+} from "@/lib/reports/attachments";
 import { getTaskForUser } from "@/lib/tasks/queries";
 
 export type UnplannedEntryInput = {
@@ -146,6 +150,11 @@ export async function uncheckPlanItem(
     return;
   }
 
+  await deleteAttachmentsForReportEntry(
+    organizationId,
+    reportId,
+    entry.id,
+  );
   await db.reportEntry.delete({ where: { id: entry.id } });
 }
 
@@ -247,6 +256,11 @@ export async function deleteReportEntry(
     throw new Error("Uncheck the plan item to remove this entry.");
   }
 
+  await deleteAttachmentsForReportEntry(
+    organizationId,
+    reportId,
+    entryId,
+  );
   await db.reportEntry.delete({ where: { id: entryId } });
 }
 
@@ -298,6 +312,7 @@ export async function deleteReport(
   }
 
   await clearPlanItemCompletionForReport(reportId);
+  await deleteAttachmentsForReport(organizationId, reportId);
   await db.report.delete({ where: { id: report.id } });
 }
 

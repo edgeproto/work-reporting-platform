@@ -70,3 +70,63 @@ export const reportEntryUpdateSchema = z.object({
   hours: reportHoursSchema,
   visibility: visibilitySchema.default("PUBLIC"),
 });
+
+export const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+]);
+
+const ALLOWED_UPLOAD_EXTENSIONS = new Set([
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".ppt",
+  ".pptx",
+  ".txt",
+]);
+
+export function validateUploadFile(
+  file: File,
+): { ok: true } | { ok: false; error: string } {
+  if (!file.name?.trim()) {
+    return { ok: false, error: "File name is required." };
+  }
+
+  if (file.size <= 0) {
+    return { ok: false, error: "File is empty." };
+  }
+
+  const ext = file.name.includes(".")
+    ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
+    : "";
+
+  const mimeAllowed =
+    file.type && ALLOWED_UPLOAD_MIME_TYPES.has(file.type.toLowerCase());
+  const extAllowed = ext && ALLOWED_UPLOAD_EXTENSIONS.has(ext);
+
+  if (!mimeAllowed && !extAllowed) {
+    return {
+      ok: false,
+      error: "File type not allowed. Use PDF, images, Office documents, or plain text.",
+    };
+  }
+
+  return { ok: true };
+}
