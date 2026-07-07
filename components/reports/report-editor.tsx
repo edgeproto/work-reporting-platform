@@ -228,7 +228,11 @@ export function ReportEditor({
         </CardContent>
       </Card>
 
-      <ReportActions reportId={report.id} status={report.status} />
+      <ReportActions
+        reportId={report.id}
+        status={report.status}
+        entries={report.entries}
+      />
     </div>
   );
 }
@@ -813,13 +817,21 @@ function AddUnplannedEntryForm({
 function ReportActions({
   reportId,
   status,
+  entries,
 }: {
   reportId: string;
   status: SubmissionStatus;
+  entries: SerializedReportEntry[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const hasEntries = entries.length > 0;
+  const allEntriesHaveHours = entries.every(
+    (entry) => Number(entry.hours) > 0,
+  );
+  const canSubmit = hasEntries && allEntriesHaveHours;
 
   const handleSubmit = () => {
     setError(null);
@@ -848,10 +860,17 @@ function ReportActions({
     <Card>
       <CardFooter className="flex flex-wrap items-center justify-between gap-4 border-t-0 bg-transparent">
         <p className="text-sm text-muted-foreground">
-          Submit when ready — checked plan items will be marked complete and
-          public entries will be visible to your team.
+          {!hasEntries
+            ? "Add at least one report entry before you can submit."
+            : !allEntriesHaveHours
+              ? "Every entry needs hours greater than zero before you can submit."
+              : "Submit when ready — checked plan items will be marked complete and public entries will be visible to your team."}
         </p>
-        <Button type="button" onClick={handleSubmit} disabled={isPending}>
+        <Button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isPending || !canSubmit}
+        >
           {isPending ? "Submitting…" : "Submit report"}
         </Button>
         {error ? <p className="w-full text-sm text-destructive">{error}</p> : null}

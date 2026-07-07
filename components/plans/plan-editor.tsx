@@ -125,7 +125,12 @@ export function PlanEditor({ plan, selectableParents = [] }: PlanEditorProps) {
         </CardContent>
       </Card>
 
-      <PlanActions planId={plan.id} status={plan.status} router={router} />
+      <PlanActions
+        planId={plan.id}
+        status={plan.status}
+        itemCount={plan.items.length}
+        router={router}
+      />
     </div>
   );
 }
@@ -396,14 +401,17 @@ function AddPlanItemForm({
 function PlanActions({
   planId,
   status,
+  itemCount,
   router,
 }: {
   planId: string;
   status: SubmissionStatus;
+  itemCount: number;
   router: ReturnType<typeof useRouter>;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const canSubmit = itemCount > 0;
 
   const handleSubmit = () => {
     setError(null);
@@ -455,9 +463,15 @@ function PlanActions({
     <Card>
       <CardFooter className="flex flex-wrap items-center justify-between gap-4 border-t-0 bg-transparent">
         <p className="text-sm text-muted-foreground">
-          Submit when ready — teammates will see public items after submission.
+          {canSubmit
+            ? "Submit when ready — teammates will see public items after submission."
+            : "Add at least one planned task before you can submit."}
         </p>
-        <Button type="button" onClick={handleSubmit} disabled={isPending}>
+        <Button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isPending || !canSubmit}
+        >
           {isPending ? "Submitting…" : "Submit plan"}
         </Button>
         {error ? <p className="w-full text-sm text-destructive">{error}</p> : null}

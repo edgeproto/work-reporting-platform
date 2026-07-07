@@ -85,6 +85,14 @@ export async function submitPlan(
 ) {
   const plan = await assertEditablePlan(planId, userId, organizationId);
 
+  const itemCount = await db.planItem.count({
+    where: { planId: plan.id },
+  });
+
+  if (itemCount === 0) {
+    throw new Error("Add at least one planned task before submitting.");
+  }
+
   return db.plan.update({
     where: { id: plan.id },
     data: {
