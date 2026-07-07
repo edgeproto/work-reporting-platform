@@ -61,6 +61,7 @@ export async function createUserAction(
       role: parsed.data.role as Role,
     });
 
+    revalidatePath("/admin/users");
     return {
       success: true,
       passwordSetLink: result.passwordSetLink,

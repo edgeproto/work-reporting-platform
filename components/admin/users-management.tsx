@@ -39,6 +39,7 @@ export type SerializedAdminUser = {
 type UsersManagementProps = {
   users: SerializedAdminUser[];
   currentUserId: string;
+  createdLink?: string;
 };
 
 function roleLabel(role: Role): string {
@@ -47,7 +48,7 @@ function roleLabel(role: Role): string {
 
 function formatExpiry(iso: string | null): string | null {
   if (!iso) return null;
-  return new Date(iso).toLocaleString();
+  return `${new Date(iso).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 function CopyLinkButton({ link }: { link: string }) {
@@ -85,21 +86,43 @@ function CopyLinkButton({ link }: { link: string }) {
   );
 }
 
-function CreateUserForm({ onUserCreated }: { onUserCreated?: () => void }) {
+function CreatedLinkBanner({ link }: { link: string }) {
+  return (
+    <div
+      className="space-y-2 rounded-lg border bg-muted/30 p-4"
+      data-testid="created-user-link"
+    >
+      <p className="text-sm font-medium">Password-set link created</p>
+      <p className="text-sm text-muted-foreground">
+        Share this link with the new user (Slack, Teams, in person, etc.).
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          readOnly
+          value={link}
+          className="font-mono text-xs"
+          data-testid="password-set-link"
+        />
+        <CopyLinkButton link={link} />
+      </div>
+    </div>
+  );
+}
+
+function CreateUserForm() {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<
     AdminActionResult,
     FormData
   >(createUserAction, {});
-  const [createdLink, setCreatedLink] = useState<string | null>(null);
 
   useEffect(() => {
     if (state.success && state.passwordSetLink) {
-      setCreatedLink(state.passwordSetLink);
-      onUserCreated?.();
-      router.refresh();
+      router.replace(
+        `/admin/users?createdLink=${encodeURIComponent(state.passwordSetLink)}`,
+      );
     }
-  }, [state.success, state.passwordSetLink, onUserCreated, router]);
+  }, [state.success, state.passwordSetLink, router]);
 
   return (
     <Card>
@@ -161,27 +184,6 @@ function CreateUserForm({ onUserCreated }: { onUserCreated?: () => void }) {
           <p className="text-sm text-destructive" data-testid="create-user-error">
             {state.error}
           </p>
-        ) : null}
-
-        {createdLink ? (
-          <div
-            className="space-y-2 rounded-lg border bg-muted/30 p-4"
-            data-testid="created-user-link"
-          >
-            <p className="text-sm font-medium">Password-set link created</p>
-            <p className="text-sm text-muted-foreground">
-              Share this link with the new user (Slack, Teams, in person, etc.).
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                readOnly
-                value={createdLink}
-                className="font-mono text-xs"
-                data-testid="password-set-link"
-              />
-              <CopyLinkButton link={createdLink} />
-            </div>
-          </div>
         ) : null}
       </CardContent>
     </Card>
@@ -348,9 +350,11 @@ function UserRow({
 export function UsersManagement({
   users,
   currentUserId,
+  createdLink,
 }: UsersManagementProps) {
   return (
     <div className="space-y-8">
+      {createdLink ? <CreatedLinkBanner link={createdLink} /> : null}
       <CreateUserForm />
 
       <section className="space-y-4">

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { signOut } from "@/lib/auth";
 import { setPasswordWithToken } from "@/lib/password-set-token";
 
 const setPasswordSchema = z
@@ -61,6 +62,10 @@ export async function setPasswordAction(
         return { error: "Invalid password-set link." };
     }
   }
+
+  // Clear any existing session (e.g. admin testing the link) so the new user
+  // lands on the login page with the success message.
+  await signOut({ redirect: false });
 
   redirect("/login?passwordSet=1");
 }

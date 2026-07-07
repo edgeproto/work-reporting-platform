@@ -53,23 +53,6 @@ async function setPasswordFromLink(
   await expect(page).toHaveURL(/\/login\?passwordSet=1/);
 }
 
-async function waitForPasswordLink(
-  page: import("@playwright/test").Page,
-  email: string,
-): Promise<string> {
-  const row = page.getByTestId(`user-row-${email}`);
-  await expect(row).toBeVisible();
-
-  const rowLink = row.getByTestId(`password-link-${email}`);
-  if (await rowLink.isVisible()) {
-    return rowLink.inputValue();
-  }
-
-  await row.getByTestId(`generate-link-${email}`).click();
-  await expect(rowLink).toBeVisible();
-  return rowLink.inputValue();
-}
-
 async function createUserAndSetPassword(
   page: import("@playwright/test").Page,
   name: string,
@@ -81,16 +64,13 @@ async function createUserAndSetPassword(
   await page.getByTestId("create-user-email").fill(email);
   await page.getByTestId("create-user-role").selectOption(role);
   await page.getByTestId("create-user-submit").click();
+  await expect(page).toHaveURL(/createdLink=/, { timeout: 10_000 });
 
-  let link: string | null = null;
-  const createdLink = page
-    .getByTestId("created-user-link")
-    .getByTestId("password-set-link");
-  if (await createdLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-    link = await createdLink.inputValue();
-  } else {
-    link = await waitForPasswordLink(page, email);
+  const linkParam = new URL(page.url()).searchParams.get("createdLink");
+  if (!linkParam) {
+    throw new Error("Password-set link missing from URL after user creation.");
   }
+  const link = decodeURIComponent(linkParam);
 
   await setPasswordFromLink(page, link, password);
 }
@@ -109,6 +89,7 @@ test("admin onboarding and reporting flow", async ({ page }) => {
     MEMBER_PASSWORD,
   );
 
+  await login(page, ADMIN_EMAIL, ADMIN_PASSWORD);
   await page.goto("/admin/users");
 
   await createUserAndSetPassword(
@@ -141,11 +122,15 @@ test("admin onboarding and reporting flow", async ({ page }) => {
   await page
     .getByRole("button", { name: new RegExp(`Check off ${taskTitle}`) })
     .click();
-  await page
+  const hoursInput = page
     .locator("li")
     .filter({ hasText: taskTitle })
-    .getByLabel("Hours")
-    .fill("2");
+    .getByLabel("Hours");
+  await hoursInput.fill("2");
+  await hoursInput.blur();
+  await expect(
+    page.getByRole("button", { name: "Submit report" }),
+  ).toBeEnabled();
   await page.getByRole("button", { name: "Submit report" }).click();
   await expect(page.getByText("This report has been submitted")).toBeVisible();
 

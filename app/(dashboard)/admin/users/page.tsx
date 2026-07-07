@@ -5,13 +5,18 @@ import { auth } from "@/lib/auth";
 import { listOrganizationUsers } from "@/lib/admin/users";
 import { canManageUsers } from "@/lib/rbac";
 
-export default async function AdminUsersPage() {
+type PageProps = {
+  searchParams: Promise<{ createdLink?: string }>;
+};
+
+export default async function AdminUsersPage({ searchParams }: PageProps) {
   const session = await auth();
 
   if (!canManageUsers(session!.user)) {
     redirect("/");
   }
 
+  const { createdLink } = await searchParams;
   const users = await listOrganizationUsers(session!.user.organizationId);
 
   const serializedUsers = users.map((user) => ({
@@ -40,6 +45,7 @@ export default async function AdminUsersPage() {
       <UsersManagement
         users={serializedUsers}
         currentUserId={session!.user.id}
+        createdLink={createdLink}
       />
     </div>
   );
