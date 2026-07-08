@@ -36,6 +36,30 @@ export function buildStorageKey(
   return `${organizationId}/${reportId}/${entryId}/${randomUUID()}-${safeName}`;
 }
 
+/** Storage key for plan-item attachments. */
+export function buildPlanItemStorageKey(
+  organizationId: string,
+  planId: string,
+  planItemId: string,
+  fileName: string,
+): string {
+  const safeName = sanitizeFileName(fileName);
+  return `${organizationId}/plans/${planId}/${planItemId}/${randomUUID()}-${safeName}`;
+}
+
+/** Storage key for user avatars. */
+export function buildAvatarStorageKey(
+  organizationId: string,
+  userId: string,
+  fileName: string,
+): string {
+  const safeName = sanitizeFileName(fileName);
+  const ext = safeName.includes(".")
+    ? safeName.slice(safeName.lastIndexOf("."))
+    : "";
+  return `${organizationId}/avatars/${userId}-${randomUUID()}${ext}`;
+}
+
 export function getAbsolutePath(storageKey: string): string {
   const uploadDir = path.resolve(getUploadDir());
   const absolute = path.resolve(uploadDir, storageKey);

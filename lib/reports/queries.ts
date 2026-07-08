@@ -47,18 +47,8 @@ export async function getReportById(
           planItem: {
             select: {
               id: true,
-              taskId: true,
-              task: { select: { id: true, title: true } },
               taskTitle: { select: { id: true, title: true } },
               customTitle: true,
-            },
-          },
-          task: {
-            select: {
-              id: true,
-              title: true,
-              type: true,
-              parentTask: { select: { id: true, title: true, type: true } },
             },
           },
           taskTitle: { select: { id: true, title: true } },
@@ -95,16 +85,6 @@ export async function getSubmittedPlanForReport(
       items: {
         orderBy: { sortOrder: "asc" },
         include: {
-          task: {
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              type: true,
-              parentTaskId: true,
-              parentTask: { select: { id: true, title: true, type: true } },
-            },
-          },
           taskTitle: { select: { id: true, title: true } },
         },
       },

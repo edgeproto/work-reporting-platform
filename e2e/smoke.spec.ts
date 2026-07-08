@@ -8,7 +8,7 @@ const MANAGER_PASSWORD = "smoke-manager-pass";
 const runId = Date.now();
 const memberEmail = `smoke-member-${runId}@localhost`;
 const managerEmail = `smoke-manager-${runId}@localhost`;
-const taskTitle = `Smoke test task ${runId}`;
+const planTitle = `Smoke test item ${runId}`;
 
 async function logout(page: import("@playwright/test").Page) {
   const signOut = page.getByRole("button", { name: "Sign out" });
@@ -100,31 +100,36 @@ test("admin onboarding and reporting flow", async ({ page }) => {
     MANAGER_PASSWORD,
   );
 
-  // Member files a daily plan with a private task
+  // Member files a daily plan with a private item from Home
   await login(page, memberEmail, MEMBER_PASSWORD);
-  await page.goto("/my-plans");
-  await page.getByRole("button", { name: "New plan" }).click();
+  await page.goto("/");
+  const dailySection = page.getByTestId("home-section-daily");
+  await expect(dailySection).toBeVisible();
+  await dailySection.getByRole("button", { name: "Submit plan" }).click();
   await expect(page.getByRole("heading", { name: "Daily Plan" })).toBeVisible();
 
-  await page.getByLabel("Task title").fill(taskTitle);
+  await page.getByLabel("Title").fill(planTitle);
   await page.getByLabel("Visibility").selectOption("PRIVATE");
-  await page.getByRole("button", { name: "Add task" }).click();
-  await expect(page.getByText(taskTitle)).toBeVisible();
+  await page.getByRole("button", { name: "Add item" }).click();
+  await expect(page.getByText(planTitle)).toBeVisible();
 
   await page.getByRole("button", { name: "Submit plan" }).click();
   await expect(page.getByText("This plan has been submitted")).toBeVisible();
 
   // Member files a daily report and checks off the plan item
-  await page.goto("/my-reports");
-  await page.getByRole("button", { name: "New report" }).click();
+  await page.goto("/");
+  await page
+    .getByTestId("home-section-daily")
+    .getByRole("button", { name: "Submit report" })
+    .click();
   await expect(page.getByRole("heading", { name: "Daily Report" })).toBeVisible();
 
   await page
-    .getByRole("button", { name: new RegExp(`Check off ${taskTitle}`) })
+    .getByRole("button", { name: new RegExp(`Check off ${planTitle}`) })
     .click();
   const hoursInput = page
     .locator("li")
-    .filter({ hasText: taskTitle })
+    .filter({ hasText: planTitle })
     .getByLabel("Hours");
   await hoursInput.fill("2");
   await hoursInput.blur();
@@ -134,16 +139,18 @@ test("admin onboarding and reporting flow", async ({ page }) => {
   await page.getByRole("button", { name: "Submit report" }).click();
   await expect(page.getByText("This report has been submitted")).toBeVisible();
 
-  // Manager sees the private entry on the team dashboard
+  // Manager sees member hours and private entry on dashboard detail
   await login(page, managerEmail, MANAGER_PASSWORD);
-  await page.goto("/team");
-  await expect(
-    page.getByRole("heading", { name: "Team Dashboard" }),
-  ).toBeVisible();
-  const timelineEntry = page
+  await page.goto("/dashboard");
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Smoke Member" })).toBeVisible();
+  await page.getByRole("link", { name: "Smoke Member" }).click();
+  await expect(page.getByRole("heading", { name: "Smoke Member" })).toBeVisible();
+  const privateEntry = page
     .locator("li")
-    .filter({ hasText: taskTitle })
+    .filter({ hasText: planTitle })
     .filter({ hasText: "Private" })
     .first();
-  await expect(timelineEntry).toBeVisible();
+  await expect(privateEntry).toBeVisible();
+  await expect(page.getByText("2.0")).toBeVisible();
 });

@@ -1,10 +1,10 @@
 import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { getPeriodBounds } from "@/lib/periods";
+import { canEditPeriod, getPeriodBounds } from "@/lib/periods";
+import { deleteAttachmentsForPlanItem } from "@/lib/reports/attachments";
 
 export type PlanItemInput = {
-  title?: string;
-  parentTaskId?: string;
+  title: string;
   description?: string;
   visibility: "PUBLIC" | "PRIVATE";
 };
@@ -50,6 +50,35 @@ export async function updateContinuousNotes(
   });
 }
 
+export async function addPlanItem(
+  planId: string,
+  userId: string,
+  organizationId: string,
+  input: PlanItemInput,
+) {
+  const plan = await assertEditablePlan(planId, userId, organizationId);
+
+  const title = input.title.trim();
+  if (!title) {
+    throw new Error("Title is required.");
+  }
+
+  const maxSort = await db.planItem.aggregate({
+    where: { planId: plan.id },
+    _max: { sortOrder: true },
+  });
+
+  return db.planItem.create({
+    data: {
+      planId: plan.id,
+      customTitle: title,
+      description: input.description?.trim() || null,
+      visibility: input.visibility,
+      sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
+    },
+  });
+}
+
 export async function deletePlanItem(
   itemId: string,
   userId: string,
@@ -60,7 +89,7 @@ export async function deletePlanItem(
       id: itemId,
       plan: { userId, organizationId },
     },
-    include: { plan: true, task: true },
+    include: { plan: true },
   });
 
   if (!item) {
@@ -71,11 +100,12 @@ export async function deletePlanItem(
     throw new Error("Submitted plans cannot be edited.");
   }
 
-  if (item.taskId) {
-    await db.task.delete({ where: { id: item.taskId } });
-  } else {
-    await db.planItem.delete({ where: { id: itemId } });
+  if (!canEditPeriod(item.plan.type, item.plan.periodStart, item.plan.periodEnd)) {
+    throw new Error("This period is outside the edit window.");
   }
+
+  await deleteAttachmentsForPlanItem(itemId);
+  await db.planItem.delete({ where: { id: itemId } });
 }
 
 export async function submitPlan(
@@ -90,7 +120,7 @@ export async function submitPlan(
   });
 
   if (itemCount === 0) {
-    throw new Error("Add at least one planned task before submitting.");
+    throw new Error("Add at least one plan item before submitting.");
   }
 
   return db.plan.update({
@@ -117,6 +147,10 @@ export async function reopenPlan(
 
   if (plan.status !== SubmissionStatus.SUBMITTED) {
     throw new Error("Only submitted plans can be reopened.");
+  }
+
+  if (!canEditPeriod(plan.type, plan.periodStart, plan.periodEnd)) {
+    throw new Error("This period is outside the edit window.");
   }
 
   return db.plan.update({
@@ -159,6 +193,10 @@ async function assertEditablePlan(
 
   if (plan.status === SubmissionStatus.SUBMITTED) {
     throw new Error("Submitted plans cannot be edited.");
+  }
+
+  if (!canEditPeriod(plan.type, plan.periodStart, plan.periodEnd)) {
+    throw new Error("This period is outside the edit window.");
   }
 
   return plan;

@@ -7,6 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { getLocale } from "@/lib/i18n/get-locale";
 
 function LoginFallback() {
   return (
@@ -19,10 +21,13 @@ function LoginFallback() {
   );
 }
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+
   return (
     <Suspense fallback={<LoginFallback />}>
-      <LoginForm />
+      <LoginForm labels={dict.auth} />
     </Suspense>
   );
 }

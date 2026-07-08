@@ -10,6 +10,7 @@ import {
   checkOffPlanItemAction,
   deleteAttachmentAction,
   deleteReportEntryAction,
+  openTomorrowPlanAction,
   submitReportAction,
   uncheckPlanItemAction,
   updateReportEntryAction,
@@ -34,10 +35,6 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { formatPeriodLabel, periodTypeLabel } from "@/lib/periods";
-import {
-  TaskPicker,
-  type SerializedSelectableTask,
-} from "@/components/tasks/task-browser";
 
 export type SerializedPlanItem = {
   id: string;
@@ -46,8 +43,6 @@ export type SerializedPlanItem = {
   visibility: "PUBLIC" | "PRIVATE";
   completedAt: string | null;
   completedInReportId: string | null;
-  taskType: PeriodType | null;
-  parentTitle: string | null;
 };
 
 export type SerializedAttachment = {
@@ -80,20 +75,20 @@ export type SerializedReport = {
   periodEnd: string;
   status: SubmissionStatus;
   submittedAt: string | null;
+  periodEditable: boolean;
+  canFileTomorrowPlan: boolean;
+  periodDay: string;
   entries: SerializedReportEntry[];
   matchingPlan: SerializedMatchingPlan | null;
 };
 
 type ReportEditorProps = {
   report: SerializedReport;
-  selectableTasks?: SerializedSelectableTask[];
 };
 
-export function ReportEditor({
-  report,
-  selectableTasks = [],
-}: ReportEditorProps) {
-  const isEditable = report.status === SubmissionStatus.DRAFT;
+export function ReportEditor({ report }: ReportEditorProps) {
+  const isEditable =
+    report.status === SubmissionStatus.DRAFT && report.periodEditable;
   const periodLabel = formatPeriodLabel(
     report.type,
     new Date(report.periodStart),
@@ -150,7 +145,7 @@ export function ReportEditor({
           <CardHeader>
             <CardTitle>From your plan</CardTitle>
             <CardDescription>
-              Check off completed tasks from your submitted plan. Each checked
+              Check off completed items from your submitted plan. Each checked
               item becomes a report entry — add hours and adjust the description
               as needed.
             </CardDescription>
@@ -169,7 +164,7 @@ export function ReportEditor({
 
             {report.matchingPlan.items.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Your submitted plan has no discrete tasks.
+                Your submitted plan has no items.
               </p>
             ) : (
               <ul className="divide-y rounded-lg border">
@@ -219,19 +214,27 @@ export function ReportEditor({
           {isEditable ? (
             <>
               <Separator />
-              <AddUnplannedEntryForm
-                reportId={report.id}
-                selectableTasks={selectableTasks}
-              />
+              <AddUnplannedEntryForm reportId={report.id} />
             </>
           ) : null}
         </CardContent>
       </Card>
 
+      {!report.periodEditable && report.status === SubmissionStatus.DRAFT ? (
+        <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+          This period is outside the edit window — this draft cannot be changed
+          or submitted.
+        </p>
+      ) : null}
+
       <ReportActions
         reportId={report.id}
         status={report.status}
         entries={report.entries}
+        periodEditable={report.periodEditable}
+        canFileTomorrowPlan={report.canFileTomorrowPlan}
+        periodDay={report.periodDay}
+        matchingPlan={report.matchingPlan}
       />
     </div>
   );
@@ -297,11 +300,6 @@ function PlanChecklistRow({
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{item.title}</span>
-              {item.taskType ? (
-                <span className="text-xs text-muted-foreground capitalize">
-                  {item.taskType.toLowerCase()}
-                </span>
-              ) : null}
               <VisibilityBadge visibility={item.visibility} />
               {completedElsewhere ? (
                 <span className="text-xs text-muted-foreground">
@@ -309,12 +307,6 @@ function PlanChecklistRow({
                 </span>
               ) : null}
             </div>
-            {item.parentTitle ? (
-              <p className="text-xs text-muted-foreground">
-                From {item.taskType === PeriodType.DAILY ? "weekly" : "monthly"}{" "}
-                task: {item.parentTitle}
-              </p>
-            ) : null}
             {!entry && item.description ? (
               <p className="text-sm text-muted-foreground">{item.description}</p>
             ) : null}
@@ -653,21 +645,8 @@ function EntryAttachments({
   );
 }
 
-const EXISTING_TASK = "existing";
-const NEW_TASK = "new";
-
-function AddUnplannedEntryForm({
-  reportId,
-  selectableTasks,
-}: {
-  reportId: string;
-  selectableTasks: SerializedSelectableTask[];
-}) {
+function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
   const router = useRouter();
-  const [mode, setMode] = useState(
-    selectableTasks.length > 0 ? EXISTING_TASK : NEW_TASK,
-  );
-  const [selectedTaskId, setSelectedTaskId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [hours, setHours] = useState("");
@@ -675,36 +654,13 @@ function AddUnplannedEntryForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const selectedTask = selectableTasks.find((t) => t.id === selectedTaskId);
-  const isExistingTask = mode === EXISTING_TASK;
-
-  const handleModeChange = (value: string) => {
-    setMode(value);
-    setSelectedTaskId("");
-    setTitle("");
-    setDescription("");
-  };
-
-  const handleSelectTask = (taskId: string) => {
-    setSelectedTaskId(taskId);
-    const task = selectableTasks.find((t) => t.id === taskId);
-    if (task) {
-      setDescription(task.description ?? "");
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     const formData = new FormData();
-    if (isExistingTask) {
-      formData.set("taskId", selectedTaskId);
-      formData.set("description", description);
-    } else {
-      formData.set("title", title);
-      formData.set("description", description);
-    }
+    formData.set("title", title);
+    formData.set("description", description);
     formData.set("hours", hours);
     formData.set("visibility", visibility);
 
@@ -714,8 +670,6 @@ function AddUnplannedEntryForm({
         setError(result.error);
         return;
       }
-      setMode(selectableTasks.length > 0 ? EXISTING_TASK : NEW_TASK);
-      setSelectedTaskId("");
       setTitle("");
       setDescription("");
       setHours("");
@@ -724,50 +678,23 @@ function AddUnplannedEntryForm({
     });
   };
 
-  const canSubmit = isExistingTask
-    ? selectedTaskId.length > 0 && !selectedTask?.disabled && hours
-    : title.trim().length > 0 && hours;
+  const canSubmit = title.trim().length > 0 && hours;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-sm font-medium">Add unplanned entry</p>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="unplanned-source">Source</Label>
-        <select
-          id="unplanned-source"
-          value={mode}
-          onChange={(e) => handleModeChange(e.target.value)}
-          className="flex h-8 w-full max-w-md rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-        >
-          <option value={EXISTING_TASK}>From My Tasks</option>
-          <option value={NEW_TASK}>New task</option>
-        </select>
-      </div>
-
-      {isExistingTask ? (
-        <TaskPicker
-          tasks={selectableTasks}
-          selectedTaskId={selectedTaskId}
-          onSelect={handleSelectTask}
-          idPrefix="unplanned"
-        />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="unplanned-title">Task title</Label>
-            <Input
-              id="unplanned-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="What did you work on?"
-              required
-            />
-          </div>
-        </div>
-      )}
-
       <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="unplanned-title">Title</Label>
+          <Input
+            id="unplanned-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="What did you work on?"
+            required
+          />
+        </div>
         <div className="space-y-1.5">
           <Label htmlFor="unplanned-hours">Hours</Label>
           <Input
@@ -818,10 +745,18 @@ function ReportActions({
   reportId,
   status,
   entries,
+  periodEditable,
+  canFileTomorrowPlan,
+  periodDay,
+  matchingPlan,
 }: {
   reportId: string;
   status: SubmissionStatus;
   entries: SerializedReportEntry[];
+  periodEditable: boolean;
+  canFileTomorrowPlan: boolean;
+  periodDay: string;
+  matchingPlan: SerializedMatchingPlan | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -831,7 +766,7 @@ function ReportActions({
   const allEntriesHaveHours = entries.every(
     (entry) => Number(entry.hours) > 0,
   );
-  const canSubmit = hasEntries && allEntriesHaveHours;
+  const canSubmit = hasEntries && allEntriesHaveHours && periodEditable;
 
   const handleSubmit = () => {
     setError(null);
@@ -845,12 +780,66 @@ function ReportActions({
     });
   };
 
+  const handleTomorrowPlan = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await openTomorrowPlanAction(periodDay);
+      if (result?.error) {
+        setError(result.error);
+      }
+    });
+  };
+
   if (status === SubmissionStatus.SUBMITTED) {
+    const checkedCount = matchingPlan
+      ? matchingPlan.items.filter(
+          (item) =>
+            item.completedInReportId === reportId ||
+            entries.some((entry) => entry.planItemId === item.id),
+        ).length
+      : 0;
+    const planItemCount = matchingPlan?.items.length ?? 0;
+
     return (
       <Card>
-        <CardContent className="flex flex-wrap items-center gap-2 pt-6 text-sm text-muted-foreground">
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <Lock className="size-4" />
+            This report has been submitted and is read-only.
+          </div>
+          {matchingPlan && planItemCount > 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Plan checklist: {checkedCount}/{planItemCount} items completed in
+              this report.
+            </p>
+          ) : null}
+          {canFileTomorrowPlan ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
+              <p className="text-sm">
+                Ready for tomorrow? File tomorrow&apos;s plan while the daily
+                window is open.
+              </p>
+              <Button
+                type="button"
+                onClick={handleTomorrowPlan}
+                disabled={isPending}
+              >
+                {isPending ? "Opening…" : "File tomorrow’s plan"}
+              </Button>
+            </div>
+          ) : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!periodEditable) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-2 pt-6 text-sm text-muted-foreground">
           <Lock className="size-4" />
-          This report has been submitted and is read-only.
+          This draft is outside the edit window and cannot be submitted.
         </CardContent>
       </Card>
     );

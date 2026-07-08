@@ -51,12 +51,11 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users         User[]
-  taskTitles    TaskTitle[]
-  tasks         Task[]
-  plans         Plan[]
-  reports       Report[]
-  subscription  Subscription?
+  users        User[]
+  taskTitles   TaskTitle[]
+  plans        Plan[]
+  reports      Report[]
+  subscription Subscription?
 
   @@map("organizations")
 }
@@ -68,6 +67,8 @@ model User {
   role           Role     @default(MEMBER)
   organizationId String
   passwordHash   String?
+  avatarKey      String?
+  avatarMimeType String?
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -75,7 +76,6 @@ model User {
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   passwordSetTokens PasswordSetToken[]
   createdTaskTitles TaskTitle[]        @relation("TaskTitleCreatedBy")
-  tasks             Task[]
   plans             Plan[]
   reports           Report[]
 
@@ -106,9 +106,9 @@ model TaskTitle {
   organizationId String
   createdAt      DateTime @default(now())
 
-  createdBy    User          @relation("TaskTitleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  planItems    PlanItem[]
+  createdBy     User          @relation("TaskTitleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planItems     PlanItem[]
   reportEntries ReportEntry[]
 
   @@unique([organizationId, title])
@@ -116,44 +116,18 @@ model TaskTitle {
   @@map("task_titles")
 }
 
-/// User-owned hierarchical tasks (monthly → weekly → daily). Not shared between users.
-model Task {
-  id             String     @id @default(cuid())
-  userId         String
-  organizationId String
-  type           PeriodType
-  title          String
-  description    String?
-  periodStart    DateTime   @db.Date
-  periodEnd      DateTime   @db.Date
-  parentTaskId   String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  parentTask    Task?         @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  childTasks    Task[]        @relation("TaskHierarchy")
-  planItems     PlanItem[]
-  reportEntries ReportEntry[]
-
-  @@index([userId, type, periodStart])
-  @@index([parentTaskId])
-  @@map("tasks")
-}
-
 model Plan {
-  id               String           @id @default(cuid())
-  userId           String
-  organizationId   String
-  type             PeriodType
-  periodStart      DateTime         @db.Date
-  periodEnd        DateTime         @db.Date
-  continuousNotes  String           @default("")
-  status           SubmissionStatus @default(DRAFT)
-  submittedAt      DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  userId          String
+  organizationId  String
+  type            PeriodType
+  periodStart     DateTime         @db.Date
+  periodEnd       DateTime         @db.Date
+  continuousNotes String           @default("")
+  status          SubmissionStatus @default(DRAFT)
+  submittedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -168,9 +142,8 @@ model Plan {
 model PlanItem {
   id                  String     @id @default(cuid())
   planId              String
-  taskId              String?
   taskTitleId         String?
-  customTitle         String?
+  customTitle         String
   description         String?
   visibility          Visibility @default(PUBLIC)
   sortOrder           Int        @default(0)
@@ -178,13 +151,12 @@ model PlanItem {
   completedInReportId String?
 
   plan              Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
-  task              Task?         @relation(fields: [taskId], references: [id], onDelete: Cascade)
   taskTitle         TaskTitle?    @relation(fields: [taskTitleId], references: [id], onDelete: SetNull)
   completedInReport Report?       @relation(fields: [completedInReportId], references: [id], onDelete: SetNull)
   reportEntries     ReportEntry[]
+  attachments       Attachment[]
 
   @@index([planId])
-  @@index([taskId])
   @@map("plan_items")
 }
 
@@ -200,9 +172,9 @@ model Report {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  entries           ReportEntry[]
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entries            ReportEntry[]
   completedPlanItems PlanItem[]
 
   @@unique([userId, type, periodStart])
@@ -212,42 +184,42 @@ model Report {
 }
 
 model ReportEntry {
-  id           String     @id @default(cuid())
-  reportId     String
-  planItemId   String?
-  taskId       String?
-  taskTitleId  String?
-  customTitle  String?
-  description  String?
-  hours        Decimal    @db.Decimal(5, 2)
-  visibility   Visibility @default(PUBLIC)
-  sortOrder    Int        @default(0)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id          String     @id @default(cuid())
+  reportId    String
+  planItemId  String?
+  taskTitleId String?
+  customTitle String?
+  description String?
+  hours       Decimal    @db.Decimal(5, 2)
+  visibility  Visibility @default(PUBLIC)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   report      Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
   planItem    PlanItem?    @relation(fields: [planItemId], references: [id], onDelete: SetNull)
-  task        Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
   taskTitle   TaskTitle?   @relation(fields: [taskTitleId], references: [id], onDelete: SetNull)
   attachments Attachment[]
 
   @@index([reportId])
-  @@index([taskId])
   @@map("report_entries")
 }
 
 model Attachment {
-  id            String @id @default(cuid())
-  reportEntryId String
+  id            String  @id @default(cuid())
+  reportEntryId String?
+  planItemId    String?
   fileName      String
   storageKey    String
   mimeType      String
   sizeBytes     Int
   createdAt     DateTime @default(now())
 
-  reportEntry ReportEntry @relation(fields: [reportEntryId], references: [id], onDelete: Cascade)
+  reportEntry ReportEntry? @relation(fields: [reportEntryId], references: [id], onDelete: Cascade)
+  planItem    PlanItem?    @relation(fields: [planItemId], references: [id], onDelete: Cascade)
 
   @@index([reportEntryId])
+  @@index([planItemId])
   @@map("attachments")
 }
 

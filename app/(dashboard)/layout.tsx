@@ -1,37 +1,31 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Role } from "@/app/generated/prisma/enums";
-import { DashboardNav, type DashboardNavLink } from "@/components/dashboard-nav";
+import type { DashboardNavLink } from "@/components/dashboard-nav";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { auth, signOut } from "@/lib/auth";
-import { canManageUsers, isManagerOrAbove } from "@/lib/rbac";
-import { Button } from "@/components/ui/button";
+import { db } from "@/lib/db";
+import type { Dictionary } from "@/lib/i18n/dictionaries/en";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { getLocale } from "@/lib/i18n/get-locale";
+import { canManageUsers } from "@/lib/rbac";
 
 async function signOutAction() {
   "use server";
   await signOut({ redirectTo: "/login" });
 }
 
-type NavLink = DashboardNavLink;
-
-function buildNavLinks(role: Role): NavLink[] {
-  const links: NavLink[] = [
-    { href: "/", label: "Home" },
-    { href: "/my-plans", label: "My Plans" },
-    { href: "/my-reports", label: "My Reports" },
-    { href: "/tasks", label: "My Tasks" },
+function buildNavLinks(role: Role, dict: Dictionary): DashboardNavLink[] {
+  const links: DashboardNavLink[] = [
+    { href: "/", label: dict.nav.home, icon: "home" },
+    { href: "/dashboard", label: dict.nav.dashboard, icon: "dashboard" },
   ];
 
-  if (isManagerOrAbove({ role })) {
-    links.push({ href: "/team", label: "Team Dashboard" });
-  } else {
-    links.push({ href: "/team", label: "Team Feed" });
+  if (canManageUsers({ role })) {
+    links.push({ href: "/admin/users", label: dict.nav.users, icon: "users" });
   }
 
-  if (canManageUsers({ role })) {
-    links.push({ href: "/admin/users", label: "Users" });
-    links.push({ href: "/admin/settings", label: "Settings" });
-  }
+  links.push({ href: "/settings", label: dict.nav.settings, icon: "settings" });
 
   return links;
 }
@@ -47,34 +41,29 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const navLinks = buildNavLinks(session.user.role);
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  const navLinks = buildNavLinks(session.user.role, dict);
+  const roleLabel = dict.roles[session.user.role];
+  const avatarUser = await db.user.findFirst({
+    where: { id: session.user.id },
+    select: { avatarKey: true },
+  });
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="font-semibold tracking-tight">
-              Status Reports
-            </Link>
-            <DashboardNav links={navLinks} />
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right text-sm sm:block">
-              <p className="font-medium">{session.user.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {session.user.role.toLowerCase()}
-              </p>
-            </div>
-            <form action={signOutAction}>
-              <Button type="submit" variant="outline" size="sm">
-                Sign out
-              </Button>
-            </form>
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
-    </div>
+    <DashboardShell
+      appTitle={dict.app.title}
+      navLinks={navLinks}
+      locale={locale}
+      languageLabel={dict.header.language}
+      userName={session.user.name ?? session.user.email ?? "User"}
+      roleLabel={roleLabel}
+      userId={session.user.id}
+      hasAvatar={!!avatarUser?.avatarKey}
+      signOutLabel={dict.header.signOut}
+      signOutAction={signOutAction}
+    >
+      {children}
+    </DashboardShell>
   );
 }

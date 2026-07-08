@@ -5,21 +5,16 @@ import {
   clearPlanItemCompletionForReport,
   completePlanItemsFromReport,
 } from "@/lib/plans/complete-items";
+import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { prefillWeeklyMonthlyReportFromDailyEntries } from "@/lib/reports/create-draft";
-import { getPeriodBounds } from "@/lib/periods";
-import {
-  createTaskForReport,
-  resolveTaskForPlanItemCheckOff,
-} from "@/lib/tasks/mutations";
+import { canEditPeriod, getPeriodBounds } from "@/lib/periods";
 import {
   deleteAttachmentsForReport,
   deleteAttachmentsForReportEntry,
 } from "@/lib/reports/attachments";
-import { getTaskForUser } from "@/lib/tasks/queries";
 
 export type UnplannedEntryInput = {
-  taskId?: string;
-  title?: string;
+  title: string;
   description?: string;
   hours: number;
   visibility: "PUBLIC" | "PRIVATE";
@@ -88,7 +83,6 @@ export async function checkOffPlanItem(
       },
     },
     include: {
-      task: { select: { id: true, title: true } },
       taskTitle: { select: { title: true } },
     },
   });
@@ -109,13 +103,6 @@ export async function checkOffPlanItem(
     return existing;
   }
 
-  const task = await resolveTaskForPlanItemCheckOff(
-    reportId,
-    userId,
-    organizationId,
-    planItem,
-  );
-
   const maxSort = await db.reportEntry.aggregate({
     where: { reportId },
     _max: { sortOrder: true },
@@ -125,7 +112,7 @@ export async function checkOffPlanItem(
     data: {
       reportId,
       planItemId,
-      taskId: task.id,
+      customTitle: getPlanItemTitle(planItem),
       description: planItem.description,
       hours: new Prisma.Decimal(0),
       visibility: planItem.visibility,
@@ -166,30 +153,9 @@ export async function addUnplannedEntry(
 ) {
   await assertEditableReport(reportId, userId, organizationId);
 
-  let taskId: string;
-
-  if (input.taskId) {
-    const task = await getTaskForUser(input.taskId, userId, organizationId);
-    if (!task) {
-      throw new Error("Task not found.");
-    }
-
-    const duplicate = await db.reportEntry.findFirst({
-      where: { reportId, taskId: task.id },
-    });
-    if (duplicate) {
-      throw new Error("This task is already on the report.");
-    }
-
-    taskId = task.id;
-  } else if (input.title?.trim()) {
-    const task = await createTaskForReport(reportId, userId, organizationId, {
-      title: input.title,
-      description: input.description,
-    });
-    taskId = task.id;
-  } else {
-    throw new Error("Select a task or enter a title.");
+  const title = input.title.trim();
+  if (!title) {
+    throw new Error("Title is required.");
   }
 
   const maxSort = await db.reportEntry.aggregate({
@@ -200,7 +166,7 @@ export async function addUnplannedEntry(
   return db.reportEntry.create({
     data: {
       reportId,
-      taskId,
+      customTitle: title,
       description: input.description?.trim() || null,
       hours: new Prisma.Decimal(input.hours),
       visibility: input.visibility,
@@ -331,6 +297,10 @@ async function assertEditableReport(
 
   if (report.status === SubmissionStatus.SUBMITTED) {
     throw new Error("Submitted reports cannot be edited.");
+  }
+
+  if (!canEditPeriod(report.type, report.periodStart, report.periodEnd)) {
+    throw new Error("This period is outside the edit window.");
   }
 
   return report;

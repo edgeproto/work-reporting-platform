@@ -40,7 +40,7 @@ export function DeletePlanButton({
         setError(result.error);
         return;
       }
-      router.push("/my-plans");
+      router.push("/");
       router.refresh();
     });
   };

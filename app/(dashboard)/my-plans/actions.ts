@@ -7,6 +7,7 @@ import { z } from "zod";
 import { PeriodType } from "@/app/generated/prisma/enums";
 import { requireSession } from "@/lib/auth";
 import {
+  addPlanItem,
   createPlanForPeriod,
   deletePlan,
   deletePlanItem,
@@ -14,15 +15,10 @@ import {
   submitPlan,
   updateContinuousNotes,
 } from "@/lib/plans/mutations";
-import { getPlanById } from "@/lib/plans/queries";
 import {
-  createDailySubTaskForPlan,
-  createDailyTaskForPlan,
-  createMonthlyTaskForPlan,
-  createWeeklySubTaskForPlan,
-  createWeeklyTaskForPlan,
-} from "@/lib/tasks/mutations";
-import { listSelectableParentTasks } from "@/lib/tasks/queries";
+  addPlanItemAttachment,
+  deletePlanItemAttachment,
+} from "@/lib/reports/attachments";
 import {
   continuousNotesSchema,
   dateStringSchema,
@@ -33,6 +29,7 @@ import {
 export type ActionResult = {
   error?: string;
   success?: boolean;
+  itemId?: string;
 };
 
 const createPlanSchema = z.object({
@@ -61,6 +58,7 @@ export async function createPlanAction(
     parsed.data.date,
   );
 
+  revalidatePath("/");
   revalidatePath("/my-plans");
   redirect(`/my-plans/${plan.id}`);
 }
@@ -99,7 +97,6 @@ export async function addPlanItemAction(
 ): Promise<ActionResult> {
   const session = await requireSession();
   const parsed = planItemSchema.safeParse({
-    parentTaskId: formData.get("parentTaskId") || undefined,
     title: formData.get("title") || undefined,
     description: formData.get("description") || undefined,
     visibility: formData.get("visibility") ?? "PUBLIC",
@@ -111,67 +108,15 @@ export async function addPlanItemAction(
   }
 
   try {
-    const plan = await getPlanById(
+    const item = await addPlanItem(
       planId,
       session.user.id,
       session.user.organizationId,
+      parsed.data,
     );
-    if (!plan) {
-      return { error: "Plan not found." };
-    }
-
-    const { parentTaskId, title, description, visibility } = parsed.data;
-
-    if (plan.type === PeriodType.MONTHLY) {
-      if (!title) {
-        return { error: "Task title is required." };
-      }
-      await createMonthlyTaskForPlan(
-        planId,
-        session.user.id,
-        session.user.organizationId,
-        { title, description, visibility },
-      );
-    } else if (plan.type === PeriodType.WEEKLY) {
-      if (parentTaskId) {
-        await createWeeklySubTaskForPlan(
-          planId,
-          session.user.id,
-          session.user.organizationId,
-          { parentTaskId, visibility },
-        );
-      } else if (title) {
-        await createWeeklyTaskForPlan(
-          planId,
-          session.user.id,
-          session.user.organizationId,
-          { title, description, visibility },
-        );
-      } else {
-        return { error: "Select a monthly task or enter a new weekly task." };
-      }
-    } else if (plan.type === PeriodType.DAILY) {
-      if (parentTaskId) {
-        await createDailySubTaskForPlan(
-          planId,
-          session.user.id,
-          session.user.organizationId,
-          { parentTaskId, visibility },
-        );
-      } else if (title) {
-        await createDailyTaskForPlan(
-          planId,
-          session.user.id,
-          session.user.organizationId,
-          { title, description, visibility },
-        );
-      } else {
-        return { error: "Select a weekly task or enter a new daily task." };
-      }
-    }
-
     revalidatePath(`/my-plans/${planId}`);
-    return { success: true };
+    revalidatePath("/");
+    return { success: true, itemId: item.id };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to add item.",
@@ -209,6 +154,7 @@ export async function submitPlanAction(planId: string): Promise<ActionResult> {
       session.user.id,
       session.user.organizationId,
     );
+    revalidatePath("/");
     revalidatePath("/my-plans");
     revalidatePath(`/my-plans/${planId}`);
     return { success: true };
@@ -228,6 +174,7 @@ export async function reopenPlanAction(planId: string): Promise<ActionResult> {
       session.user.id,
       session.user.organizationId,
     );
+    revalidatePath("/");
     revalidatePath("/my-plans");
     revalidatePath(`/my-plans/${planId}`);
     return { success: true };
@@ -247,6 +194,7 @@ export async function deletePlanAction(planId: string): Promise<ActionResult> {
       session.user.id,
       session.user.organizationId,
     );
+    revalidatePath("/");
     revalidatePath("/my-plans");
     return { success: true };
   } catch (error) {
@@ -256,11 +204,56 @@ export async function deletePlanAction(planId: string): Promise<ActionResult> {
   }
 }
 
-export async function listSelectableParentTasksAction(planId: string) {
+export async function uploadPlanItemAttachmentAction(
+  planId: string,
+  planItemId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const session = await requireSession();
-  return listSelectableParentTasks(
-    planId,
-    session.user.id,
-    session.user.organizationId,
-  );
+  const file = formData.get("file");
+
+  if (!(file instanceof File)) {
+    return { error: "No file selected." };
+  }
+
+  try {
+    await addPlanItemAttachment(
+      planId,
+      planItemId,
+      session.user.id,
+      session.user.organizationId,
+      file,
+    );
+    revalidatePath(`/my-plans/${planId}`);
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to upload file.",
+    };
+  }
+}
+
+export async function deletePlanItemAttachmentAction(
+  planId: string,
+  attachmentId: string,
+): Promise<ActionResult> {
+  const session = await requireSession();
+
+  try {
+    await deletePlanItemAttachment(
+      attachmentId,
+      planId,
+      session.user.id,
+      session.user.organizationId,
+    );
+    revalidatePath(`/my-plans/${planId}`);
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to delete attachment.",
+    };
+  }
 }

@@ -40,7 +40,7 @@ export function DeleteReportButton({
         setError(result.error);
         return;
       }
-      router.push("/my-reports");
+      router.push("/");
       router.refresh();
     });
   };

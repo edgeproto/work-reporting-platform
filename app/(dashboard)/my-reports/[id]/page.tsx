@@ -8,16 +8,17 @@ import {
   type SerializedMatchingPlan,
   type SerializedReport,
 } from "@/components/reports/report-editor";
-import {
-  serializeSelectableTask,
-  type SerializedSelectableTask,
-} from "@/lib/tasks/serialize";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { requireSession } from "@/lib/auth";
 import { getReportEntryTitle } from "@/lib/reports/entry-title";
 import { prefillWeeklyMonthlyReportFromDailyEntries } from "@/lib/reports/create-draft";
 import { getReportById, getSubmittedPlanForReport } from "@/lib/reports/queries";
-import { listSelectableTasksForReport } from "@/lib/tasks/queries";
+import {
+  addDays,
+  canEditPeriod,
+  formatDateInTz,
+  getPeriodBounds,
+} from "@/lib/periods";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -36,8 +37,6 @@ function serializeMatchingPlan(
       visibility: item.visibility,
       completedAt: item.completedAt?.toISOString() ?? null,
       completedInReportId: item.completedInReportId,
-      taskType: item.task?.type ?? null,
-      parentTitle: item.task?.parentTask?.title ?? null,
     })),
   };
 }
@@ -46,6 +45,27 @@ function serializeReport(
   report: NonNullable<Awaited<ReturnType<typeof getReportById>>>,
   matchingPlan: SerializedMatchingPlan | null,
 ): SerializedReport {
+  const periodDay = formatDateInTz(report.periodStart);
+  const periodEditable = canEditPeriod(
+    report.type,
+    report.periodStart,
+    report.periodEnd,
+  );
+
+  let canFileTomorrowPlan = false;
+  if (
+    report.type === PeriodType.DAILY &&
+    report.status === SubmissionStatus.SUBMITTED
+  ) {
+    const tomorrow = addDays(periodDay, 1);
+    const tomorrowBounds = getPeriodBounds(PeriodType.DAILY, tomorrow);
+    canFileTomorrowPlan = canEditPeriod(
+      PeriodType.DAILY,
+      tomorrowBounds.periodStart,
+      tomorrowBounds.periodEnd,
+    );
+  }
+
   return {
     id: report.id,
     type: report.type,
@@ -53,6 +73,9 @@ function serializeReport(
     periodEnd: report.periodEnd.toISOString(),
     status: report.status,
     submittedAt: report.submittedAt?.toISOString() ?? null,
+    periodEditable,
+    canFileTomorrowPlan,
+    periodDay,
     matchingPlan,
     entries: report.entries.map((entry) => ({
       id: entry.id,
@@ -101,40 +124,26 @@ export default async function ReportEditorPage({ params }: PageProps) {
       report)
     : report;
 
-  const [submittedPlan, selectableTasks] = await Promise.all([
-    getSubmittedPlanForReport(
-      session.user.id,
-      session.user.organizationId,
-      editorReport.type,
-      editorReport.periodStart,
-    ),
-    listSelectableTasksForReport(
-      id,
-      session.user.id,
-      session.user.organizationId,
-    ),
-  ]);
+  const submittedPlan = await getSubmittedPlanForReport(
+    session.user.id,
+    session.user.organizationId,
+    editorReport.type,
+    editorReport.periodStart,
+  );
 
   const matchingPlan = submittedPlan
     ? serializeMatchingPlan(submittedPlan)
     : null;
 
-  const serializedTasks: SerializedSelectableTask[] = selectableTasks.map(
-    serializeSelectableTask,
-  );
-
   return (
     <div className="space-y-4">
       <Link
-        href="/my-reports"
+        href="/"
         className="inline-flex h-7 items-center rounded-lg px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
-        ← Back to My Reports
+        ← Back to Home
       </Link>
-      <ReportEditor
-        report={serializeReport(editorReport, matchingPlan)}
-        selectableTasks={serializedTasks}
-      />
+      <ReportEditor report={serializeReport(editorReport, matchingPlan)} />
     </div>
   );
 }

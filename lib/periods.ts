@@ -88,7 +88,7 @@ function getDayOfWeek(dateStr: string, tz: string): number {
   return map[weekday] ?? 0;
 }
 
-function addDays(dateStr: string, days: number): string {
+export function addDays(dateStr: string, days: number): string {
   const date = parseDateString(dateStr);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
@@ -387,6 +387,56 @@ export function isPeriodPast(
   const today = todayDateString(tz);
   const end = formatDateInTz(periodEnd, tz);
   return today > end;
+}
+
+/**
+ * Whether the user may create/edit/submit plans and reports for this period.
+ *
+ * - MONTHLY: previous calendar month + current month
+ * - WEEKLY: previous week + every week that intersects the current calendar month
+ * - DAILY: yesterday + today
+ */
+export function canEditPeriod(
+  type: PeriodType,
+  periodStart: Date,
+  periodEnd: Date,
+  todayStr = todayDateString(),
+  tz = getOrgTimezone(),
+): boolean {
+  const startStr = formatDateInTz(periodStart, tz);
+  const endStr = formatDateInTz(periodEnd, tz);
+
+  switch (type) {
+    case PeriodType.DAILY: {
+      const yesterday = addDays(todayStr, -1);
+      return startStr === todayStr || startStr === yesterday;
+    }
+    case PeriodType.WEEKLY: {
+      const currentWeek = getPeriodBounds(PeriodType.WEEKLY, todayStr, tz);
+      const currentSunday = formatDateInTz(currentWeek.periodStart, tz);
+      const previousSunday = addDays(currentSunday, -7);
+      if (startStr === currentSunday || startStr === previousSunday) {
+        return true;
+      }
+
+      const monthBounds = getMonthBounds(parseDateString(todayStr), tz);
+      const monthFirst = formatDateInTz(monthBounds.periodStart, tz);
+      const monthLast = formatDateInTz(monthBounds.periodEnd, tz);
+      return startStr <= monthLast && endStr >= monthFirst;
+    }
+    case PeriodType.MONTHLY: {
+      const currentMonth = todayStr.slice(0, 7);
+      const [year, month] = currentMonth.split("-").map(Number);
+      const previousMonth =
+        month === 1
+          ? `${year - 1}-12`
+          : `${year}-${String(month - 1).padStart(2, "0")}`;
+      const startMonth = startStr.slice(0, 7);
+      return startMonth === currentMonth || startMonth === previousMonth;
+    }
+    default:
+      return false;
+  }
 }
 
 /** Calendar month bounds (first–last day) containing a reference date. */

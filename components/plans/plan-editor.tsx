@@ -2,14 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Trash2 } from "lucide-react";
+import { Lock, Paperclip, Trash2, Upload, X } from "lucide-react";
 
 import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
 import {
   addPlanItemAction,
   deletePlanItemAction,
+  deletePlanItemAttachmentAction,
   reopenPlanAction,
   submitPlanAction,
+  uploadPlanItemAttachmentAction,
 } from "@/app/(dashboard)/my-plans/actions";
 import { PlanStatusBadge, VisibilityBadge } from "@/components/plans/plan-badges";
 import { DeletePlanButton } from "@/components/plans/delete-plan-button";
@@ -27,7 +29,13 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { formatPeriodLabel, periodTypeLabel } from "@/lib/periods";
-import type { SelectableParentTask } from "@/lib/tasks/queries";
+
+export type SerializedPlanAttachment = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
 
 export type SerializedPlanItem = {
   id: string;
@@ -35,8 +43,7 @@ export type SerializedPlanItem = {
   description: string | null;
   visibility: "PUBLIC" | "PRIVATE";
   completedAt: string | null;
-  taskType: PeriodType | null;
-  parentTitle: string | null;
+  attachments: SerializedPlanAttachment[];
 };
 
 export type SerializedPlan = {
@@ -46,30 +53,33 @@ export type SerializedPlan = {
   periodEnd: string;
   status: SubmissionStatus;
   submittedAt: string | null;
-  periodPassed: boolean;
+  periodEditable: boolean;
   items: SerializedPlanItem[];
 };
 
 type PlanEditorProps = {
   plan: SerializedPlan;
-  selectableParents?: SelectableParentTask[];
 };
 
-export function PlanEditor({ plan, selectableParents = [] }: PlanEditorProps) {
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function PlanEditor({ plan }: PlanEditorProps) {
   const router = useRouter();
-  const isEditable = plan.status === SubmissionStatus.DRAFT && !plan.periodPassed;
+  const isEditable =
+    plan.status === SubmissionStatus.DRAFT && plan.periodEditable;
   const periodLabel = formatPeriodLabel(
     plan.type,
     new Date(plan.periodStart),
     new Date(plan.periodEnd),
   );
-
-  const addTaskDescription =
-    plan.type === PeriodType.MONTHLY
-      ? "Create monthly tasks for this plan. Tasks are private to you."
-      : plan.type === PeriodType.WEEKLY
-        ? "Add weekly tasks directly, or create sub-tasks from your monthly tasks for this month."
-        : "Add daily tasks directly, or create sub-tasks from your weekly tasks for this week.";
 
   return (
     <div className="space-y-6">
@@ -86,21 +96,25 @@ export function PlanEditor({ plan, selectableParents = [] }: PlanEditorProps) {
         </div>
       </div>
 
-      {plan.periodPassed ? (
+      {!plan.periodEditable ? (
         <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-          This {plan.type.toLowerCase()} period has passed — tasks can no longer be added.
+          This period is outside the edit window — items can no longer be
+          changed.
         </p>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Planned tasks</CardTitle>
-          <CardDescription>{addTaskDescription}</CardDescription>
+          <CardTitle>Plan items</CardTitle>
+          <CardDescription>
+            Add titled work items for this period. Title is required;
+            description and a file attachment are optional.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {plan.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No planned tasks yet. Add your first item below.
+              No plan items yet. Add your first item below.
             </p>
           ) : (
             <ul className="divide-y rounded-lg border">
@@ -115,13 +129,7 @@ export function PlanEditor({ plan, selectableParents = [] }: PlanEditorProps) {
             </ul>
           )}
 
-          {isEditable ? (
-            <AddPlanItemForm
-              planId={plan.id}
-              planType={plan.type}
-              selectableParents={selectableParents}
-            />
-          ) : null}
+          {isEditable ? <AddPlanItemForm planId={plan.id} /> : null}
         </CardContent>
       </Card>
 
@@ -129,8 +137,130 @@ export function PlanEditor({ plan, selectableParents = [] }: PlanEditorProps) {
         planId={plan.id}
         status={plan.status}
         itemCount={plan.items.length}
+        periodEditable={plan.periodEditable}
         router={router}
       />
+    </div>
+  );
+}
+
+function PlanItemAttachments({
+  planId,
+  itemId,
+  attachments,
+  readOnly,
+}: {
+  planId: string;
+  itemId: string;
+  attachments: SerializedPlanAttachment[];
+  readOnly: boolean;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setError(null);
+    const formData = new FormData();
+    formData.set("file", file);
+
+    startTransition(async () => {
+      const result = await uploadPlanItemAttachmentAction(
+        planId,
+        itemId,
+        formData,
+      );
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  const handleDelete = (attachmentId: string) => {
+    setError(null);
+    startTransition(async () => {
+      const result = await deletePlanItemAttachmentAction(planId, attachmentId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Paperclip className="size-3.5" />
+        Attachments
+      </div>
+
+      {attachments.length > 0 ? (
+        <ul className="space-y-1">
+          {attachments.map((attachment) => (
+            <li
+              key={attachment.id}
+              className="flex items-center justify-between gap-2 rounded-md border bg-muted/20 px-2.5 py-1.5 text-sm"
+            >
+              <a
+                href={`/api/attachments/${attachment.id}`}
+                className="flex min-w-0 flex-1 items-center gap-2 hover:underline"
+                download={attachment.fileName}
+              >
+                <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{attachment.fileName}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {formatFileSize(attachment.sizeBytes)}
+                </span>
+              </a>
+              {!readOnly ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => handleDelete(attachment.id)}
+                  disabled={isPending}
+                  aria-label={`Remove ${attachment.fileName}`}
+                >
+                  <X />
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted-foreground">No attachments.</p>
+      )}
+
+      {!readOnly ? (
+        <div>
+          <Label
+            htmlFor={`plan-upload-${itemId}`}
+            className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-normal text-primary hover:underline"
+          >
+            <Upload className="size-3.5" />
+            {isPending ? "Uploading…" : "Upload file"}
+          </Label>
+          <input
+            id={`plan-upload-${itemId}`}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+            onChange={handleUpload}
+            disabled={isPending}
+            className="sr-only"
+          />
+        </div>
+      ) : null}
+
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }
@@ -160,98 +290,60 @@ function PlanItemRow({
   };
 
   return (
-    <li className="flex items-start justify-between gap-4 px-4 py-3">
-      <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{item.title}</span>
-          {item.taskType ? (
-            <span className="text-xs text-muted-foreground capitalize">
-              {item.taskType.toLowerCase()}
-            </span>
+    <li className="space-y-3 px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{item.title}</span>
+            <VisibilityBadge visibility={item.visibility} />
+            {item.completedAt ? (
+              <span className="text-xs text-muted-foreground">Completed</span>
+            ) : null}
+          </div>
+          {item.description ? (
+            <p className="text-sm text-muted-foreground">{item.description}</p>
           ) : null}
-          <VisibilityBadge visibility={item.visibility} />
-          {item.completedAt ? (
-            <span className="text-xs text-muted-foreground">Completed</span>
-          ) : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
-        {item.parentTitle ? (
-          <p className="text-xs text-muted-foreground">
-            From {item.taskType === PeriodType.DAILY ? "weekly" : "monthly"} task:{" "}
-            {item.parentTitle}
-          </p>
+        {!readOnly ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleDelete}
+            disabled={isPending}
+            aria-label={`Delete ${item.title}`}
+          >
+            <Trash2 />
+          </Button>
         ) : null}
-        {item.description ? (
-          <p className="text-sm text-muted-foreground">{item.description}</p>
-        ) : null}
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </div>
-      {!readOnly ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={handleDelete}
-          disabled={isPending}
-          aria-label={`Delete ${item.title}`}
-        >
-          <Trash2 />
-        </Button>
-      ) : null}
+      <PlanItemAttachments
+        planId={planId}
+        itemId={item.id}
+        attachments={item.attachments}
+        readOnly={readOnly}
+      />
     </li>
   );
 }
 
-const NEW_TASK = "__new__";
-
-function AddPlanItemForm({
-  planId,
-  planType,
-  selectableParents,
-}: {
-  planId: string;
-  planType: PeriodType;
-  selectableParents: SelectableParentTask[];
-}) {
+function AddPlanItemForm({ planId }: { planId: string }) {
   const router = useRouter();
-  const [mode, setMode] = useState(NEW_TASK);
-  const [selectedParentId, setSelectedParentId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
+  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  const isMonthly = planType === PeriodType.MONTHLY;
-  const isNewTask = isMonthly || mode === NEW_TASK;
-  const selectedParent = selectableParents.find((t) => t.id === selectedParentId);
-
-  const handleModeChange = (value: string) => {
-    setMode(value);
-    setSelectedParentId("");
-    setTitle("");
-    setDescription("");
-  };
-
-  const handleParentChange = (value: string) => {
-    setSelectedParentId(value);
-    const parent = selectableParents.find((t) => t.id === value);
-    if (parent) {
-      setTitle(parent.title);
-      setDescription(parent.description ?? "");
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     const formData = new FormData();
-    if (isNewTask) {
-      formData.set("title", title);
-      formData.set("description", description);
-    } else {
-      formData.set("parentTaskId", selectedParentId);
-    }
+    formData.set("title", title);
+    formData.set("description", description);
     formData.set("visibility", visibility);
 
     startTransition(async () => {
@@ -260,138 +352,92 @@ function AddPlanItemForm({
         setError(result.error);
         return;
       }
-      setMode(NEW_TASK);
-      setSelectedParentId("");
+
+      // Attachment requires an item id; refresh then let user attach on the row.
+      // If a file was selected on create, we re-fetch via refresh — attach after
+      // add by uploading once the page reloads isn't available. Prefer uploading
+      // on the new item after create when file is present via a follow-up path.
+      if (file && result.itemId) {
+        const uploadData = new FormData();
+        uploadData.set("file", file);
+        const uploadResult = await uploadPlanItemAttachmentAction(
+          planId,
+          result.itemId,
+          uploadData,
+        );
+        if (uploadResult.error) {
+          setError(uploadResult.error);
+          router.refresh();
+          return;
+        }
+      }
+
       setTitle("");
       setDescription("");
       setVisibility("PUBLIC");
+      setFile(null);
       router.refresh();
     });
   };
-
-  const canSubmit = isNewTask
-    ? title.trim().length > 0
-    : selectedParentId.length > 0 && !selectedParent?.disabled;
-
-  const periodLabel =
-    planType === PeriodType.WEEKLY
-      ? "weekly"
-      : planType === PeriodType.DAILY
-        ? "daily"
-        : "monthly";
 
   return (
     <>
       <Separator />
       <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm font-medium">Add {periodLabel} task</p>
+        <p className="text-sm font-medium">Add plan item</p>
 
-        {!isMonthly ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="item-title">Title</Label>
+            <Input
+              id="item-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What do you plan to work on?"
+              required
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="item-description">Description</Label>
+            <Textarea
+              id="item-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Additional context…"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="task-mode">Source</Label>
+            <Label htmlFor="item-visibility">Visibility</Label>
             <select
-              id="task-mode"
-              value={mode}
-              onChange={(e) => handleModeChange(e.target.value)}
-              className="flex h-8 w-full max-w-md rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+              id="item-visibility"
+              value={visibility}
+              onChange={(e) =>
+                setVisibility(e.target.value as "PUBLIC" | "PRIVATE")
+              }
+              className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
             >
-              <option value={NEW_TASK}>New independent task</option>
-              <option value="parent">
-                {planType === PeriodType.WEEKLY
-                  ? "Sub-task from monthly task"
-                  : "Sub-task from weekly task"}
-              </option>
+              <option value="PUBLIC">Public — visible to teammates</option>
+              <option value="PRIVATE">Private — managers only</option>
             </select>
           </div>
-        ) : null}
-
-        {isNewTask ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="item-title">Task title</Label>
-              <Input
-                id="item-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={`What do you plan to work on?`}
-                required
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="item-description">Description</Label>
-              <Textarea
-                id="item-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                placeholder="Additional context…"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="item-file">File (optional)</Label>
+            <Input
+              id="item-file"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
           </div>
-        ) : (
-          <div className="grid gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="parent-select">
-                {planType === PeriodType.WEEKLY
-                  ? "Monthly task"
-                  : "Weekly task"}
-              </Label>
-              <select
-                id="parent-select"
-                value={selectedParentId}
-                onChange={(e) => handleParentChange(e.target.value)}
-                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-                required
-              >
-                <option value="">— Select —</option>
-                {selectableParents.map((task) => (
-                  <option key={task.id} value={task.id} disabled={task.disabled}>
-                    {task.title}
-                    {task.disabled && task.disabledReason
-                      ? ` (${task.disabledReason})`
-                      : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {selectedParent ? (
-              <>
-                <div className="space-y-1.5">
-                  <Label>Task title</Label>
-                  <p className="text-sm font-medium">{selectedParent.title}</p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Description (from parent)</Label>
-                  <p className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                    {selectedParent.description?.trim()
-                      ? selectedParent.description
-                      : "No description"}
-                  </p>
-                </div>
-              </>
-            ) : null}
-          </div>
-        )}
-
-        <div className="space-y-1.5 sm:max-w-xs">
-          <Label htmlFor="item-visibility">Visibility</Label>
-          <select
-            id="item-visibility"
-            value={visibility}
-            onChange={(e) =>
-              setVisibility(e.target.value as "PUBLIC" | "PRIVATE")
-            }
-            className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-          >
-            <option value="PUBLIC">Public — visible to teammates</option>
-            <option value="PRIVATE">Private — managers only</option>
-          </select>
         </div>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button type="submit" disabled={isPending || !canSubmit}>
-          {isPending ? "Adding…" : "Add task"}
+        <Button type="submit" disabled={isPending || title.trim().length === 0}>
+          {isPending ? "Adding…" : "Add item"}
         </Button>
       </form>
     </>
@@ -402,16 +448,18 @@ function PlanActions({
   planId,
   status,
   itemCount,
+  periodEditable,
   router,
 }: {
   planId: string;
   status: SubmissionStatus;
   itemCount: number;
+  periodEditable: boolean;
   router: ReturnType<typeof useRouter>;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const canSubmit = itemCount > 0;
+  const canSubmit = itemCount > 0 && periodEditable;
 
   const handleSubmit = () => {
     setError(null);
@@ -445,15 +493,28 @@ function PlanActions({
             <Lock className="size-4" />
             This plan has been submitted and is visible to your team.
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleReopen}
-            disabled={isPending}
-          >
-            {isPending ? "Reopening…" : "Reopen as draft"}
-          </Button>
+          {periodEditable ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleReopen}
+              disabled={isPending}
+            >
+              {isPending ? "Reopening…" : "Reopen as draft"}
+            </Button>
+          ) : null}
           {error ? <p className="w-full text-sm text-destructive">{error}</p> : null}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!periodEditable) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-2 pt-6 text-sm text-muted-foreground">
+          <Lock className="size-4" />
+          This draft is outside the edit window and cannot be submitted.
         </CardContent>
       </Card>
     );
@@ -465,7 +526,7 @@ function PlanActions({
         <p className="text-sm text-muted-foreground">
           {canSubmit
             ? "Submit when ready — teammates will see public items after submission."
-            : "Add at least one planned task before you can submit."}
+            : "Add at least one plan item before you can submit."}
         </p>
         <Button
           type="button"

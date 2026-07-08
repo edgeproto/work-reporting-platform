@@ -6,9 +6,9 @@ import {
   type SerializedPlan,
 } from "@/components/plans/plan-editor";
 import { requireSession } from "@/lib/auth";
+import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { getPlanById } from "@/lib/plans/queries";
-import { isPeriodPast } from "@/lib/periods";
-import { listSelectableParentTasks } from "@/lib/tasks/queries";
+import { canEditPeriod } from "@/lib/periods";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -24,19 +24,19 @@ function serializePlan(
     periodEnd: plan.periodEnd.toISOString(),
     status: plan.status,
     submittedAt: plan.submittedAt?.toISOString() ?? null,
-    periodPassed: isPeriodPast(plan.periodEnd),
+    periodEditable: canEditPeriod(plan.type, plan.periodStart, plan.periodEnd),
     items: plan.items.map((item) => ({
       id: item.id,
-      title:
-        item.task?.title ??
-        item.taskTitle?.title ??
-        item.customTitle ??
-        "Untitled",
+      title: getPlanItemTitle(item),
       description: item.description,
       visibility: item.visibility,
       completedAt: item.completedAt?.toISOString() ?? null,
-      taskType: item.task?.type ?? null,
-      parentTitle: item.task?.parentTask?.title ?? null,
+      attachments: item.attachments.map((attachment) => ({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+      })),
     })),
   };
 }
@@ -55,24 +55,15 @@ export default async function PlanEditorPage({ params }: PageProps) {
     notFound();
   }
 
-  const selectableParents = await listSelectableParentTasks(
-    plan.id,
-    session.user.id,
-    session.user.organizationId,
-  );
-
   return (
     <div className="space-y-4">
       <Link
-        href="/my-plans"
+        href="/"
         className="inline-flex h-7 items-center rounded-lg px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
-        ← Back to My Plans
+        ← Back to Home
       </Link>
-      <PlanEditor
-        plan={serializePlan(plan)}
-        selectableParents={selectableParents}
-      />
+      <PlanEditor plan={serializePlan(plan)} />
     </div>
   );
 }

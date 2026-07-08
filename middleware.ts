@@ -7,6 +7,14 @@ const { auth } = NextAuth(authConfig);
 
 const authRoutes = ["/login", "/set-password"];
 
+const legacyRedirects: Record<string, string> = {
+  "/my-plans": "/",
+  "/my-reports": "/",
+  "/tasks": "/",
+  "/team": "/dashboard",
+  "/admin/settings": "/admin/users",
+};
+
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth;
@@ -22,6 +30,11 @@ export default auth((req) => {
 
   if (isLoggedIn && pathname === "/login") {
     return NextResponse.redirect(new URL("/", req.nextUrl.origin));
+  }
+
+  const legacyTarget = legacyRedirects[pathname];
+  if (legacyTarget) {
+    return NextResponse.redirect(new URL(legacyTarget, req.nextUrl.origin));
   }
 
   if (pathname.startsWith("/admin") && req.auth?.user?.role !== "ADMIN") {

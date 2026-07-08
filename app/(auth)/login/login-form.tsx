@@ -14,8 +14,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { Dictionary } from "@/lib/i18n/dictionaries/en";
 
-export function LoginForm() {
+type LoginFormProps = {
+  labels: Dictionary["auth"];
+};
+
+export function LoginForm({ labels }: LoginFormProps) {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const passwordSet = searchParams.get("passwordSet") === "1";
@@ -24,10 +29,8 @@ export function LoginForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sign in</CardTitle>
-        <CardDescription>
-          Enter your credentials to access the reporting platform.
-        </CardDescription>
+        <CardTitle>{labels.signIn}</CardTitle>
+        <CardDescription>{labels.signInDescription}</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-4">
@@ -35,7 +38,7 @@ export function LoginForm() {
 
           {passwordSet ? (
             <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200">
-              Password set successfully. You can sign in now.
+              {labels.passwordSetSuccess}
             </p>
           ) : null}
 
@@ -46,7 +49,7 @@ export function LoginForm() {
           ) : null}
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{labels.email}</Label>
             <Input
               id="email"
               name="email"
@@ -57,7 +60,7 @@ export function LoginForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{labels.password}</Label>
             <Input
               id="password"
               name="password"
@@ -68,7 +71,7 @@ export function LoginForm() {
           </div>
 
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Signing in…" : "Sign in"}
+            {pending ? labels.signingIn : labels.signIn}
           </Button>
         </form>
       </CardContent>

@@ -22,24 +22,18 @@ export const dateStringSchema = z
 
 export const visibilitySchema = z.enum(["PUBLIC", "PRIVATE"]);
 
-export const planItemSchema = z
-  .object({
-    parentTaskId: z.string().min(1).optional(),
-    title: z.string().trim().min(1, "Task title is required.").max(200).optional(),
-    description: z.string().max(2000).optional(),
-    visibility: visibilitySchema.default("PUBLIC"),
-  })
-  .refine(
-    (data) => data.parentTaskId || data.title,
-    { message: "Select a parent task or enter a title.", path: ["title"] },
-  );
+export const planItemSchema = z.object({
+  title: z.string().trim().min(1, "Title is required.").max(200),
+  description: z.string().max(2000).optional(),
+  visibility: visibilitySchema.default("PUBLIC"),
+});
 
 export const continuousNotesSchema = z.string().max(10000);
 
 export const reportEntryTitleSchema = z
   .string()
   .trim()
-  .min(1, "Task title is required.")
+  .min(1, "Title is required.")
   .max(200);
 
 export const reportHoursSchema = z.coerce
@@ -52,18 +46,12 @@ export const submitReportHoursSchema = z.coerce
   .positive("Hours must be greater than zero.")
   .max(24, "Hours cannot exceed 24 per entry.");
 
-export const unplannedEntrySchema = z
-  .object({
-    taskId: z.string().min(1).optional(),
-    title: reportEntryTitleSchema.optional(),
-    description: z.string().max(2000).optional(),
-    hours: submitReportHoursSchema,
-    visibility: visibilitySchema.default("PUBLIC"),
-  })
-  .refine((data) => data.taskId || data.title?.trim(), {
-    message: "Select a task or enter a title.",
-    path: ["title"],
-  });
+export const unplannedEntrySchema = z.object({
+  title: reportEntryTitleSchema,
+  description: z.string().max(2000).optional(),
+  hours: submitReportHoursSchema,
+  visibility: visibilitySchema.default("PUBLIC"),
+});
 
 export const reportEntryUpdateSchema = z.object({
   description: z.string().max(2000).optional(),

@@ -6,6 +6,8 @@ import { z } from "zod";
 
 import { PeriodType } from "@/app/generated/prisma/enums";
 import { requireSession } from "@/lib/auth";
+import { createPlanForPeriod } from "@/lib/plans/mutations";
+import { addDays, canEditPeriod, getPeriodBounds } from "@/lib/periods";
 import {
   addUnplannedEntry,
   checkOffPlanItem,
@@ -114,7 +116,6 @@ export async function addUnplannedEntryAction(
 ): Promise<ActionResult> {
   const session = await requireSession();
   const parsed = unplannedEntrySchema.safeParse({
-    taskId: formData.get("taskId") || undefined,
     title: formData.get("title") || undefined,
     description: formData.get("description") || undefined,
     hours: formData.get("hours"),
@@ -207,6 +208,7 @@ export async function submitReportAction(reportId: string): Promise<ActionResult
       session.user.id,
       session.user.organizationId,
     );
+    revalidatePath("/");
     revalidatePath("/my-reports");
     revalidatePath(`/my-reports/${reportId}`);
     revalidatePath("/my-plans");
@@ -214,6 +216,42 @@ export async function submitReportAction(reportId: string): Promise<ActionResult
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to submit report.",
+    };
+  }
+}
+
+export async function openTomorrowPlanAction(
+  reportDay: string,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  const parsed = dateStringSchema.safeParse(reportDay);
+  if (!parsed.success) {
+    return { error: "Invalid date." };
+  }
+
+  const tomorrow = addDays(parsed.data, 1);
+
+  try {
+    const bounds = getPeriodBounds(PeriodType.DAILY, tomorrow);
+    if (!canEditPeriod(PeriodType.DAILY, bounds.periodStart, bounds.periodEnd)) {
+      return { error: "Tomorrow’s plan is outside the daily edit window." };
+    }
+
+    const plan = await createPlanForPeriod(
+      session.user.id,
+      session.user.organizationId,
+      PeriodType.DAILY,
+      tomorrow,
+    );
+    revalidatePath("/");
+    redirect(`/my-plans/${plan.id}`);
+  } catch (error) {
+    if (error && typeof error === "object" && "digest" in error) {
+      throw error;
+    }
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to open tomorrow’s plan.",
     };
   }
 }

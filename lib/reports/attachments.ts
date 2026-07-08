@@ -1,6 +1,8 @@
 import { Role, Visibility } from "@/app/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { canEditPeriod } from "@/lib/periods";
 import {
+  buildPlanItemStorageKey,
   buildStorageKey,
   deleteFile,
   deleteFilesForEntry,
@@ -26,6 +28,10 @@ async function assertEditableReportEntry(
 
   if (report.status === "SUBMITTED") {
     throw new Error("Submitted reports cannot be edited.");
+  }
+
+  if (!canEditPeriod(report.type, report.periodStart, report.periodEnd)) {
+    throw new Error("This period is outside the edit window.");
   }
 
   const entry = await db.reportEntry.findFirst({
@@ -114,6 +120,125 @@ export async function deleteAttachment(
   await db.attachment.delete({ where: { id: attachment.id } });
 }
 
+async function assertEditablePlanItem(
+  planId: string,
+  planItemId: string,
+  userId: string,
+  organizationId: string,
+) {
+  const plan = await db.plan.findFirst({
+    where: { id: planId, userId, organizationId },
+  });
+
+  if (!plan) {
+    throw new Error("Plan not found.");
+  }
+
+  if (plan.status === "SUBMITTED") {
+    throw new Error("Submitted plans cannot be edited.");
+  }
+
+  if (!canEditPeriod(plan.type, plan.periodStart, plan.periodEnd)) {
+    throw new Error("This period is outside the edit window.");
+  }
+
+  const item = await db.planItem.findFirst({
+    where: { id: planItemId, planId },
+  });
+
+  if (!item) {
+    throw new Error("Plan item not found.");
+  }
+
+  return { plan, item };
+}
+
+export async function addPlanItemAttachment(
+  planId: string,
+  planItemId: string,
+  userId: string,
+  organizationId: string,
+  file: File,
+) {
+  await assertEditablePlanItem(planId, planItemId, userId, organizationId);
+
+  const validation = validateUploadFile(file);
+  if (!validation.ok) {
+    throw new Error(validation.error);
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  if (buffer.byteLength > getMaxUploadBytes()) {
+    throw new Error(
+      `File exceeds maximum size of ${Math.round(getMaxUploadBytes() / (1024 * 1024))} MB.`,
+    );
+  }
+
+  const storageKey = buildPlanItemStorageKey(
+    organizationId,
+    planId,
+    planItemId,
+    file.name,
+  );
+
+  await saveFile(storageKey, buffer);
+
+  try {
+    return await db.attachment.create({
+      data: {
+        planItemId,
+        fileName: file.name,
+        storageKey,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: buffer.byteLength,
+      },
+    });
+  } catch (error) {
+    await deleteFile(storageKey);
+    throw error;
+  }
+}
+
+export async function deletePlanItemAttachment(
+  attachmentId: string,
+  planId: string,
+  userId: string,
+  organizationId: string,
+) {
+  const attachment = await db.attachment.findFirst({
+    where: {
+      id: attachmentId,
+      planItem: {
+        planId,
+        plan: { userId, organizationId, status: "DRAFT" },
+      },
+    },
+    select: {
+      id: true,
+      storageKey: true,
+    },
+  });
+
+  if (!attachment) {
+    throw new Error("Attachment not found.");
+  }
+
+  await deleteFile(attachment.storageKey);
+  await db.attachment.delete({ where: { id: attachment.id } });
+}
+
+export async function deleteAttachmentsForPlanItem(planItemId: string) {
+  const attachments = await db.attachment.findMany({
+    where: { planItemId },
+    select: { id: true, storageKey: true },
+  });
+
+  await Promise.all(attachments.map((a) => deleteFile(a.storageKey)));
+  if (attachments.length > 0) {
+    await db.attachment.deleteMany({ where: { planItemId } });
+  }
+}
+
 export async function deleteAttachmentsForReportEntry(
   organizationId: string,
   reportId: string,
@@ -157,15 +282,35 @@ export async function getAttachmentForDownload(
   const attachment = await db.attachment.findFirst({
     where: {
       id: attachmentId,
-      reportEntry: {
-        report: { organizationId: viewer.organizationId },
-      },
+      OR: [
+        {
+          reportEntry: {
+            report: { organizationId: viewer.organizationId },
+          },
+        },
+        {
+          planItem: {
+            plan: { organizationId: viewer.organizationId },
+          },
+        },
+      ],
     },
     include: {
       reportEntry: {
         select: {
           visibility: true,
           report: {
+            select: {
+              userId: true,
+              status: true,
+            },
+          },
+        },
+      },
+      planItem: {
+        select: {
+          visibility: true,
+          plan: {
             select: {
               userId: true,
               status: true,
@@ -180,17 +325,37 @@ export async function getAttachmentForDownload(
     return null;
   }
 
-  const ownerId = attachment.reportEntry.report.userId;
-  const entryVisibility = attachment.reportEntry.visibility;
+  if (attachment.reportEntry) {
+    const ownerId = attachment.reportEntry.report.userId;
+    const entryVisibility = attachment.reportEntry.visibility;
 
-  if (viewer.id !== ownerId) {
-    if (
-      entryVisibility === Visibility.PRIVATE &&
-      !canViewPrivate(viewer, ownerId, viewer.id)
-    ) {
-      return null;
+    if (viewer.id !== ownerId) {
+      if (
+        entryVisibility === Visibility.PRIVATE &&
+        !canViewPrivate(viewer, ownerId, viewer.id)
+      ) {
+        return null;
+      }
     }
+
+    return attachment;
   }
 
-  return attachment;
+  if (attachment.planItem) {
+    const ownerId = attachment.planItem.plan.userId;
+    const itemVisibility = attachment.planItem.visibility;
+
+    if (viewer.id !== ownerId) {
+      if (
+        itemVisibility === Visibility.PRIVATE &&
+        !canViewPrivate(viewer, ownerId, viewer.id)
+      ) {
+        return null;
+      }
+    }
+
+    return attachment;
+  }
+
+  return null;
 }

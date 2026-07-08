@@ -49,7 +49,6 @@ export async function prefillWeeklyMonthlyReportFromDailyEntries(
   const entriesToCreate = dailyReports.flatMap((dailyReport) =>
     dailyReport.entries.map((entry) => ({
       reportId,
-      taskId: entry.taskId,
       taskTitleId: entry.taskTitleId,
       customTitle: entry.customTitle,
       description: entry.description,
