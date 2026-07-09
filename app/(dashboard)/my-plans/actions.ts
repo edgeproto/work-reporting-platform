@@ -14,6 +14,7 @@ import {
   reopenPlan,
   submitPlan,
   updateContinuousNotes,
+  updatePlanItem,
 } from "@/lib/plans/mutations";
 import {
   addPlanItemAttachment,
@@ -120,6 +121,42 @@ export async function addPlanItemAction(
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to add item.",
+    };
+  }
+}
+
+export async function updatePlanItemAction(
+  planId: string,
+  itemId: string,
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  const parsed = planItemSchema.safeParse({
+    title: formData.get("title") || undefined,
+    description: formData.get("description") || undefined,
+    visibility: formData.get("visibility") ?? "PUBLIC",
+  });
+
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0]?.message ?? "Invalid input.";
+    return { error: firstError };
+  }
+
+  try {
+    await updatePlanItem(
+      itemId,
+      session.user.id,
+      session.user.organizationId,
+      parsed.data,
+    );
+    revalidatePath(`/my-plans/${planId}`);
+    revalidatePath("/");
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to update item.",
     };
   }
 }

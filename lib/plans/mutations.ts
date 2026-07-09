@@ -1,4 +1,4 @@
-import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
+import { PeriodType, PlanItemOutcome, SubmissionStatus } from "@/app/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { canEditPeriod, getPeriodBounds } from "@/lib/periods";
 import { deleteAttachmentsForPlanItem } from "@/lib/reports/attachments";
@@ -79,6 +79,62 @@ export async function addPlanItem(
   });
 }
 
+export async function updatePlanItem(
+  itemId: string,
+  userId: string,
+  organizationId: string,
+  input: PlanItemInput,
+) {
+  const item = await db.planItem.findFirst({
+    where: {
+      id: itemId,
+      plan: { userId, organizationId },
+    },
+    include: { plan: true },
+  });
+
+  if (!item) {
+    throw new Error("Plan item not found.");
+  }
+
+  if (!canEditPeriod(item.plan.type, item.plan.periodStart, item.plan.periodEnd)) {
+    throw new Error("This period is outside the edit window.");
+  }
+
+  if (
+    item.plan.status !== SubmissionStatus.DRAFT &&
+    item.plan.status !== SubmissionStatus.SUBMITTED
+  ) {
+    throw new Error("This plan cannot be edited.");
+  }
+
+  if (item.outcome !== PlanItemOutcome.OPEN) {
+    throw new Error("Resolved items cannot be edited.");
+  }
+
+  const title = input.title.trim();
+  if (!title) {
+    throw new Error("Title is required.");
+  }
+
+  await db.$transaction([
+    db.planItem.update({
+      where: { id: itemId },
+      data: {
+        customTitle: title,
+        description: input.description?.trim() || null,
+        visibility: input.visibility,
+      },
+    }),
+    db.plan.update({
+      where: { id: item.planId },
+      data: { updatedAt: new Date() },
+    }),
+  ]);
+
+  return db.planItem.findUniqueOrThrow({ where: { id: itemId } });
+}
+
 export async function deletePlanItem(
   itemId: string,
   userId: string,
@@ -128,6 +184,7 @@ export async function submitPlan(
     data: {
       status: SubmissionStatus.SUBMITTED,
       submittedAt: new Date(),
+      updatedAt: new Date(),
     },
   });
 }

@@ -11,7 +11,6 @@ import {
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { requireSession } from "@/lib/auth";
 import { getReportEntryTitle } from "@/lib/reports/entry-title";
-import { prefillWeeklyMonthlyReportFromDailyEntries } from "@/lib/reports/create-draft";
 import { getReportById, getSubmittedPlanForReport } from "@/lib/reports/queries";
 import {
   addDays,
@@ -35,7 +34,7 @@ function serializeMatchingPlan(
       title: getPlanItemTitle(item),
       description: item.description,
       visibility: item.visibility,
-      completedAt: item.completedAt?.toISOString() ?? null,
+      outcome: item.outcome,
       completedInReportId: item.completedInReportId,
     })),
   };
@@ -80,6 +79,7 @@ function serializeReport(
     entries: report.entries.map((entry) => ({
       id: entry.id,
       planItemId: entry.planItemId,
+      planItemOutcome: entry.planItemOutcome,
       title: getReportEntryTitle(entry),
       description: entry.description,
       hours: entry.hours.toString(),
@@ -108,27 +108,11 @@ export default async function ReportEditorPage({ params }: PageProps) {
     notFound();
   }
 
-  const isDraftWeeklyOrMonthly =
-    report.type !== PeriodType.DAILY && report.status === SubmissionStatus.DRAFT;
-
-  if (isDraftWeeklyOrMonthly) {
-    await prefillWeeklyMonthlyReportFromDailyEntries(
-      id,
-      session.user.id,
-      session.user.organizationId,
-    );
-  }
-
-  const editorReport = isDraftWeeklyOrMonthly
-    ? ((await getReportById(id, session.user.id, session.user.organizationId)) ??
-      report)
-    : report;
-
   const submittedPlan = await getSubmittedPlanForReport(
     session.user.id,
     session.user.organizationId,
-    editorReport.type,
-    editorReport.periodStart,
+    report.type,
+    report.periodStart,
   );
 
   const matchingPlan = submittedPlan
@@ -143,7 +127,7 @@ export default async function ReportEditorPage({ params }: PageProps) {
       >
         ← Back to Home
       </Link>
-      <ReportEditor report={serializeReport(editorReport, matchingPlan)} />
+      <ReportEditor report={serializeReport(report, matchingPlan)} />
     </div>
   );
 }

@@ -4,10 +4,12 @@ import {
   MemberRosterTable,
 } from "@/components/dashboard/member-roster";
 import {
-  fetchMemberRoster,
   parseDashboardFilters,
   type DashboardSearchParams,
-} from "@/lib/dashboard/queries";
+} from "@/lib/dashboard/filters";
+import { fetchMemberRoster } from "@/lib/dashboard/queries";
+import { isManagerOrAbove } from "@/lib/rbac";
+import { formatPeriodLabel } from "@/lib/periods";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { getLocale } from "@/lib/i18n/get-locale";
 
@@ -29,19 +31,25 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   };
 
   const rows = await fetchMemberRoster(viewer, filters);
+  const periodLabel = formatPeriodLabel(
+    filters.periodType,
+    filters.periodStart,
+    filters.periodEnd,
+  );
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {dict.nav.teamFeed}
+        </h1>
         <p className="text-muted-foreground">
-          Team roster with plan completion and working hours for the selected
-          range.
+          Team roster for {periodLabel}.
         </p>
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Date range</h2>
+        <h2 className="text-lg font-medium">Period</h2>
         <DashboardFiltersForm filters={filters} />
       </section>
 
@@ -51,6 +59,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           rows={rows}
           filters={filters}
           roleLabels={dict.roles}
+          showChangeTimestamps={isManagerOrAbove(viewer)}
         />
       </section>
     </div>

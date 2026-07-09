@@ -2,15 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Paperclip, Trash2, Upload, X } from "lucide-react";
+import { Lock, Paperclip, Pencil, Trash2, Upload, X } from "lucide-react";
 
-import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
+import { PeriodType, PlanItemOutcome, SubmissionStatus } from "@/app/generated/prisma/enums";
+import { PlanItemOutcomeBadge } from "@/components/plans/plan-badges";
 import {
   addPlanItemAction,
   deletePlanItemAction,
   deletePlanItemAttachmentAction,
   reopenPlanAction,
   submitPlanAction,
+  updatePlanItemAction,
   uploadPlanItemAttachmentAction,
 } from "@/app/(dashboard)/my-plans/actions";
 import { PlanStatusBadge, VisibilityBadge } from "@/components/plans/plan-badges";
@@ -42,7 +44,7 @@ export type SerializedPlanItem = {
   title: string;
   description: string | null;
   visibility: "PUBLIC" | "PRIVATE";
-  completedAt: string | null;
+  outcome: PlanItemOutcome;
   attachments: SerializedPlanAttachment[];
 };
 
@@ -73,8 +75,11 @@ function formatFileSize(bytes: number): string {
 
 export function PlanEditor({ plan }: PlanEditorProps) {
   const router = useRouter();
-  const isEditable =
-    plan.status === SubmissionStatus.DRAFT && plan.periodEditable;
+  const isDraft = plan.status === SubmissionStatus.DRAFT;
+  const isSubmitted = plan.status === SubmissionStatus.SUBMITTED;
+  const canAddItems = isDraft && plan.periodEditable;
+  const canEditItems =
+    plan.periodEditable && (isDraft || isSubmitted);
   const periodLabel = formatPeriodLabel(
     plan.type,
     new Date(plan.periodStart),
@@ -123,13 +128,14 @@ export function PlanEditor({ plan }: PlanEditorProps) {
                   key={item.id}
                   planId={plan.id}
                   item={item}
-                  readOnly={!isEditable}
+                  canEdit={canEditItems && item.outcome === PlanItemOutcome.OPEN}
+                  canDelete={canAddItems}
                 />
               ))}
             </ul>
           )}
 
-          {isEditable ? <AddPlanItemForm planId={plan.id} /> : null}
+          {canAddItems ? <AddPlanItemForm planId={plan.id} /> : null}
         </CardContent>
       </Card>
 
@@ -268,15 +274,21 @@ function PlanItemAttachments({
 function PlanItemRow({
   planId,
   item,
-  readOnly,
+  canEdit,
+  canDelete,
 }: {
   planId: string;
   item: SerializedPlanItem;
-  readOnly: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(item.title);
+  const [description, setDescription] = useState(item.description ?? "");
+  const [visibility, setVisibility] = useState(item.visibility);
 
   const handleDelete = () => {
     startTransition(async () => {
@@ -289,6 +301,97 @@ function PlanItemRow({
     });
   };
 
+  const handleSave = () => {
+    setError(null);
+    const formData = new FormData();
+    formData.set("title", title);
+    formData.set("description", description);
+    formData.set("visibility", visibility);
+
+    startTransition(async () => {
+      const result = await updatePlanItemAction(planId, item.id, {}, formData);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setEditing(false);
+      router.refresh();
+    });
+  };
+
+  if (editing) {
+    return (
+      <li className="space-y-3 px-4 py-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor={`edit-title-${item.id}`}>Title</Label>
+            <Input
+              id={`edit-title-${item.id}`}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor={`edit-desc-${item.id}`}>Description</Label>
+            <Textarea
+              id={`edit-desc-${item.id}`}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`edit-vis-${item.id}`}>Visibility</Label>
+            <select
+              id={`edit-vis-${item.id}`}
+              value={visibility}
+              onChange={(e) =>
+                setVisibility(e.target.value as "PUBLIC" | "PRIVATE")
+              }
+              className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+            >
+              <option value="PUBLIC">Public</option>
+              <option value="PRIVATE">Private</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSave}
+            disabled={isPending || title.trim().length === 0}
+          >
+            {isPending ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setEditing(false);
+              setTitle(item.title);
+              setDescription(item.description ?? "");
+              setVisibility(item.visibility);
+              setError(null);
+            }}
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
+        </div>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <PlanItemAttachments
+          planId={planId}
+          itemId={item.id}
+          attachments={item.attachments}
+          readOnly={false}
+        />
+      </li>
+    );
+  }
+
   return (
     <li className="space-y-3 px-4 py-3">
       <div className="flex items-start justify-between gap-4">
@@ -296,8 +399,8 @@ function PlanItemRow({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{item.title}</span>
             <VisibilityBadge visibility={item.visibility} />
-            {item.completedAt ? (
-              <span className="text-xs text-muted-foreground">Completed</span>
+            {item.outcome !== PlanItemOutcome.OPEN ? (
+              <PlanItemOutcomeBadge outcome={item.outcome} />
             ) : null}
           </div>
           {item.description ? (
@@ -305,24 +408,38 @@ function PlanItemRow({
           ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
-        {!readOnly ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleDelete}
-            disabled={isPending}
-            aria-label={`Delete ${item.title}`}
-          >
-            <Trash2 />
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-1">
+          {canEdit ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setEditing(true)}
+              disabled={isPending}
+              aria-label={`Edit ${item.title}`}
+            >
+              <Pencil />
+            </Button>
+          ) : null}
+          {canDelete ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleDelete}
+              disabled={isPending}
+              aria-label={`Delete ${item.title}`}
+            >
+              <Trash2 />
+            </Button>
+          ) : null}
+        </div>
       </div>
       <PlanItemAttachments
         planId={planId}
         itemId={item.id}
         attachments={item.attachments}
-        readOnly={readOnly}
+        readOnly={!canEdit}
       />
     </li>
   );
@@ -491,7 +608,8 @@ function PlanActions({
         <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Lock className="size-4" />
-            This plan has been submitted and is visible to your team.
+            This plan has been submitted. Use the edit icon on each item to
+            update it within the edit window.
           </div>
           {periodEditable ? (
             <Button

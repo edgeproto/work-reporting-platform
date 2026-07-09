@@ -134,8 +134,11 @@ async function assertEditablePlanItem(
     throw new Error("Plan not found.");
   }
 
-  if (plan.status === "SUBMITTED") {
-    throw new Error("Submitted plans cannot be edited.");
+  if (
+    plan.status !== "DRAFT" &&
+    plan.status !== "SUBMITTED"
+  ) {
+    throw new Error("This plan cannot be edited.");
   }
 
   if (!canEditPeriod(plan.type, plan.periodStart, plan.periodEnd)) {
@@ -184,7 +187,7 @@ export async function addPlanItemAttachment(
   await saveFile(storageKey, buffer);
 
   try {
-    return await db.attachment.create({
+    const attachment = await db.attachment.create({
       data: {
         planItemId,
         fileName: file.name,
@@ -193,6 +196,11 @@ export async function addPlanItemAttachment(
         sizeBytes: buffer.byteLength,
       },
     });
+    await db.plan.update({
+      where: { id: planId },
+      data: { updatedAt: new Date() },
+    });
+    return attachment;
   } catch (error) {
     await deleteFile(storageKey);
     throw error;
@@ -210,12 +218,24 @@ export async function deletePlanItemAttachment(
       id: attachmentId,
       planItem: {
         planId,
-        plan: { userId, organizationId, status: "DRAFT" },
+        plan: { userId, organizationId },
       },
     },
     select: {
       id: true,
       storageKey: true,
+      planItem: {
+        select: {
+          plan: {
+            select: {
+              status: true,
+              type: true,
+              periodStart: true,
+              periodEnd: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -223,8 +243,21 @@ export async function deletePlanItemAttachment(
     throw new Error("Attachment not found.");
   }
 
+  const plan = attachment.planItem?.plan;
+  if (
+    !plan ||
+    (plan.status !== "DRAFT" && plan.status !== "SUBMITTED") ||
+    !canEditPeriod(plan.type, plan.periodStart, plan.periodEnd)
+  ) {
+    throw new Error("Attachment not found.");
+  }
+
   await deleteFile(attachment.storageKey);
   await db.attachment.delete({ where: { id: attachment.id } });
+  await db.plan.update({
+    where: { id: planId },
+    data: { updatedAt: new Date() },
+  });
 }
 
 export async function deleteAttachmentsForPlanItem(planItemId: string) {

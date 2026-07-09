@@ -1,4 +1,4 @@
-import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
+import { PeriodType, PlanItemOutcome, SubmissionStatus } from "@/app/generated/prisma/enums";
 import { getPlanForPeriod } from "@/lib/plans/queries";
 import { getReportEntryTitle } from "@/lib/reports/entry-title";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
@@ -104,7 +104,9 @@ async function loadSection(
           id: plan.id,
           status: toFilingStatus(plan.status),
           itemCount: plan.items.length,
-          completedCount: plan.items.filter((item) => item.completedAt).length,
+          completedCount: plan.items.filter(
+            (item) => item.outcome === PlanItemOutcome.COMPLETED,
+          ).length,
           itemTitles: plan.items.slice(0, 3).map((item) => getPlanItemTitle(item)),
         }
       : null,

@@ -10,7 +10,8 @@ export const ko: Dictionary = {
   },
   nav: {
     home: "홈",
-    dashboard: "대시보드",
+    myFeed: "내 피드",
+    teamFeed: "팀 피드",
     users: "사용자",
     settings: "설정",
   },

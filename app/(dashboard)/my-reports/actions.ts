@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { PeriodType } from "@/app/generated/prisma/enums";
+import { PeriodType, PlanItemOutcome } from "@/app/generated/prisma/enums";
 import { requireSession } from "@/lib/auth";
 import { createPlanForPeriod } from "@/lib/plans/mutations";
 import { addDays, canEditPeriod, getPeriodBounds } from "@/lib/periods";
@@ -14,6 +14,7 @@ import {
   createReportForPeriod,
   deleteReport,
   deleteReportEntry,
+  setPlanItemOutcomeInReport,
   submitReport,
   uncheckPlanItem,
   updateReportEntry,
@@ -105,6 +106,31 @@ export async function uncheckPlanItemAction(
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to uncheck item.",
+    };
+  }
+}
+
+export async function setPlanItemOutcomeAction(
+  reportId: string,
+  planItemId: string,
+  outcome: PlanItemOutcome,
+): Promise<ActionResult> {
+  const session = await requireSession();
+
+  try {
+    await setPlanItemOutcomeInReport(
+      reportId,
+      planItemId,
+      outcome,
+      session.user.id,
+      session.user.organizationId,
+    );
+    revalidatePath(`/my-reports/${reportId}`);
+    return { success: true };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to update plan item.",
     };
   }
 }

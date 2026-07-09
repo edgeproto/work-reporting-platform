@@ -31,6 +31,13 @@ enum Visibility {
   PRIVATE
 }
 
+enum PlanItemOutcome {
+  OPEN
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 enum SubscriptionPlan {
   FREE
   TEAM
@@ -146,7 +153,8 @@ model PlanItem {
   customTitle         String
   description         String?
   visibility          Visibility @default(PUBLIC)
-  sortOrder           Int        @default(0)
+  sortOrder           Int              @default(0)
+  outcome             PlanItemOutcome  @default(OPEN)
   completedAt         DateTime?
   completedInReportId String?
 
@@ -190,9 +198,10 @@ model ReportEntry {
   taskTitleId String?
   customTitle String?
   description String?
-  hours       Decimal    @db.Decimal(5, 2)
-  visibility  Visibility @default(PUBLIC)
-  sortOrder   Int        @default(0)
+  hours           Decimal           @db.Decimal(5, 2)
+  visibility      Visibility        @default(PUBLIC)
+  planItemOutcome PlanItemOutcome?
+  sortOrder       Int               @default(0)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 

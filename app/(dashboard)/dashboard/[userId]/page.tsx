@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { VisibilityBadge } from "@/components/plans/plan-badges";
+import { PlanItemOutcomeBadge, VisibilityBadge } from "@/components/plans/plan-badges";
+import { PlanItemOutcome } from "@/app/generated/prisma/enums";
 import {
   Card,
   CardContent,
@@ -11,10 +12,13 @@ import {
 } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import {
-  fetchMemberDetail,
+  dashboardFiltersToSearchParams,
   parseDashboardFilters,
   type DashboardSearchParams,
-} from "@/lib/dashboard/queries";
+} from "@/lib/dashboard/filters";
+import { fetchMemberDetail } from "@/lib/dashboard/queries";
+import { formatDashboardTimestamp } from "@/lib/dashboard/period";
+import { isManagerOrAbove } from "@/lib/rbac";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { formatPeriodLabel, periodTypeLabel } from "@/lib/periods";
@@ -23,6 +27,29 @@ type PageProps = {
   params: Promise<{ userId: string }>;
   searchParams: Promise<DashboardSearchParams>;
 };
+
+function ChangeTimestamps({
+  submittedAt,
+  updatedAt,
+}: {
+  submittedAt: Date | null;
+  updatedAt: Date;
+}) {
+  const changedAfterSubmit =
+    submittedAt &&
+    updatedAt.getTime() > submittedAt.getTime() + 1000;
+
+  return (
+    <div className="mt-3 space-y-0.5 border-t pt-3 text-xs text-muted-foreground">
+      {submittedAt ? (
+        <p>Submitted {formatDashboardTimestamp(submittedAt)}</p>
+      ) : null}
+      {changedAfterSubmit ? (
+        <p>Last changed {formatDashboardTimestamp(updatedAt)}</p>
+      ) : null}
+    </div>
+  );
+}
 
 export default async function MemberDashboardPage({
   params,
@@ -46,21 +73,13 @@ export default async function MemberDashboardPage({
     notFound();
   }
 
-  const backParams = new URLSearchParams();
-  if (filters.rangePreset !== "week") {
-    backParams.set("range", filters.rangePreset);
-  }
-  if (filters.rangePreset === "custom") {
-    backParams.set("from", filters.dateFrom.toISOString().slice(0, 10));
-    backParams.set("to", filters.dateTo.toISOString().slice(0, 10));
-  }
-  if (filters.sort !== "name") {
-    backParams.set("sort", filters.sort);
-  }
-  if (!(filters.sort === "name" && filters.dir === "asc")) {
-    backParams.set("dir", filters.dir);
-  }
-  const backQs = backParams.toString();
+  const backQs = dashboardFiltersToSearchParams(filters).toString();
+  const periodLabel = formatPeriodLabel(
+    filters.periodType,
+    filters.periodStart,
+    filters.periodEnd,
+  );
+  const showTimestamps = isManagerOrAbove(viewer);
 
   return (
     <div className="space-y-8">
@@ -75,9 +94,7 @@ export default async function MemberDashboardPage({
           {detail.member.name}
         </h1>
         <p className="text-muted-foreground">
-          {dict.roles[detail.member.role]} ·{" "}
-          {filters.dateFrom.toISOString().slice(0, 10)} –{" "}
-          {filters.dateTo.toISOString().slice(0, 10)}
+          {dict.roles[detail.member.role]} · {periodLabel}
         </p>
       </div>
 
@@ -85,7 +102,7 @@ export default async function MemberDashboardPage({
         <Card>
           <CardHeader>
             <CardTitle>Plan complete</CardTitle>
-            <CardDescription>Submitted plan items in range</CardDescription>
+            <CardDescription>Submitted plan items for this period</CardDescription>
           </CardHeader>
           <CardContent className="text-3xl font-semibold">
             {detail.completionPct == null
@@ -96,7 +113,7 @@ export default async function MemberDashboardPage({
         <Card>
           <CardHeader>
             <CardTitle>Working hours</CardTitle>
-            <CardDescription>Visible report hours in range</CardDescription>
+            <CardDescription>Visible report hours for this period</CardDescription>
           </CardHeader>
           <CardContent className="text-3xl font-semibold">
             {detail.totalHours.toFixed(1)}
@@ -105,117 +122,115 @@ export default async function MemberDashboardPage({
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Plans</h2>
-        {detail.plans.length === 0 ? (
+        <h2 className="text-lg font-medium">Plan</h2>
+        {!detail.plan ? (
           <p className="text-sm text-muted-foreground">
-            No submitted plans in this range.
+            No submitted plan for this period.
           </p>
         ) : (
-          <ul className="space-y-3">
-            {detail.plans.map((plan) => (
-              <li key={plan.id}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">
-                      {periodTypeLabel(plan.type)} plan
-                    </CardTitle>
-                    <CardDescription>
-                      {formatPeriodLabel(
-                        plan.type,
-                        plan.periodStart,
-                        plan.periodEnd,
-                      )}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {plan.items.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No visible items.
-                      </p>
-                    ) : (
-                      <ul className="divide-y rounded-lg border">
-                        {plan.items.map((item) => (
-                          <li
-                            key={item.id}
-                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
-                          >
-                            <span className="font-medium">{item.title}</span>
-                            <div className="flex items-center gap-2">
-                              <VisibilityBadge visibility={item.visibility} />
-                              <span className="text-xs text-muted-foreground">
-                                {item.completed ? "Completed" : "Open"}
-                              </span>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ul>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {periodTypeLabel(detail.plan.type)} plan
+              </CardTitle>
+              <CardDescription>
+                {formatPeriodLabel(
+                  detail.plan.type,
+                  detail.plan.periodStart,
+                  detail.plan.periodEnd,
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {detail.plan.items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No visible items.</p>
+              ) : (
+                <ul className="divide-y rounded-lg border">
+                  {detail.plan.items.map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                    >
+                      <span className="font-medium">{item.title}</span>
+                      <div className="flex items-center gap-2">
+                        <VisibilityBadge visibility={item.visibility} />
+                        {item.outcome !== PlanItemOutcome.OPEN ? (
+                          <PlanItemOutcomeBadge outcome={item.outcome} />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Open</span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {showTimestamps ? (
+                <ChangeTimestamps
+                  submittedAt={detail.plan.submittedAt}
+                  updatedAt={detail.plan.updatedAt}
+                />
+              ) : null}
+            </CardContent>
+          </Card>
         )}
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Reports</h2>
-        {detail.reports.length === 0 ? (
+        <h2 className="text-lg font-medium">Report</h2>
+        {!detail.report ? (
           <p className="text-sm text-muted-foreground">
-            No submitted reports in this range.
+            No submitted report for this period.
           </p>
         ) : (
-          <ul className="space-y-3">
-            {detail.reports.map((report) => (
-              <li key={report.id}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">
-                      {periodTypeLabel(report.type)} report
-                    </CardTitle>
-                    <CardDescription>
-                      {formatPeriodLabel(
-                        report.type,
-                        report.periodStart,
-                        report.periodEnd,
-                      )}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {report.entries.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No visible entries.
-                      </p>
-                    ) : (
-                      <ul className="divide-y rounded-lg border">
-                        {report.entries.map((entry) => (
-                          <li
-                            key={entry.id}
-                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
-                          >
-                            <div className="min-w-0">
-                              <p className="font-medium">{entry.title}</p>
-                              {entry.description ? (
-                                <p className="text-muted-foreground">
-                                  {entry.description}
-                                </p>
-                              ) : null}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <VisibilityBadge visibility={entry.visibility} />
-                              <span className="text-muted-foreground">
-                                {entry.hours.toFixed(1)} h
-                              </span>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ul>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {periodTypeLabel(detail.report.type)} report
+              </CardTitle>
+              <CardDescription>
+                {formatPeriodLabel(
+                  detail.report.type,
+                  detail.report.periodStart,
+                  detail.report.periodEnd,
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {detail.report.entries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No visible entries.</p>
+              ) : (
+                <ul className="divide-y rounded-lg border">
+                  {detail.report.entries.map((entry) => (
+                    <li
+                      key={entry.id}
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium">{entry.title}</p>
+                        {entry.description ? (
+                          <p className="text-muted-foreground">
+                            {entry.description}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <VisibilityBadge visibility={entry.visibility} />
+                        <span className="text-muted-foreground">
+                          {entry.hours.toFixed(1)} h
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {showTimestamps ? (
+                <ChangeTimestamps
+                  submittedAt={detail.report.submittedAt}
+                  updatedAt={detail.report.updatedAt}
+                />
+              ) : null}
+            </CardContent>
+          </Card>
         )}
       </section>
     </div>

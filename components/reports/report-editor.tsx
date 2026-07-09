@@ -2,21 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Lock, Paperclip, Trash2, Upload, X } from "lucide-react";
+import { Lock, Paperclip, Trash2, Upload, X } from "lucide-react";
 
-import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
+import { PeriodType, PlanItemOutcome, SubmissionStatus } from "@/app/generated/prisma/enums";
 import {
   addUnplannedEntryAction,
-  checkOffPlanItemAction,
   deleteAttachmentAction,
   deleteReportEntryAction,
   openTomorrowPlanAction,
+  setPlanItemOutcomeAction,
   submitReportAction,
-  uncheckPlanItemAction,
   updateReportEntryAction,
   uploadAttachmentAction,
 } from "@/app/(dashboard)/my-reports/actions";
 import { DeleteReportButton } from "@/components/reports/delete-report-button";
+import { PlanItemOutcomeBadge } from "@/components/plans/plan-badges";
 import {
   ReportStatusBadge,
   VisibilityBadge,
@@ -41,7 +41,7 @@ export type SerializedPlanItem = {
   title: string;
   description: string | null;
   visibility: "PUBLIC" | "PRIVATE";
-  completedAt: string | null;
+  outcome: PlanItemOutcome;
   completedInReportId: string | null;
 };
 
@@ -55,6 +55,7 @@ export type SerializedAttachment = {
 export type SerializedReportEntry = {
   id: string;
   planItemId: string | null;
+  planItemOutcome: PlanItemOutcome | null;
   title: string;
   description: string | null;
   hours: string;
@@ -114,10 +115,10 @@ export function ReportEditor({ report }: ReportEditorProps) {
     ? "Report entries"
     : "Unplanned work";
   const entriesSectionDescription = isWeeklyOrMonthly
-    ? "Pre-filled from your submitted daily reports in this period. Edit hours and descriptions, or add more below."
+    ? "Work logged for this period. Add entries manually below."
     : "Work that was not on your plan, or entries you add directly.";
   const emptyEntriesMessage = isWeeklyOrMonthly
-    ? "No entries yet. Submit daily reports in this period to pre-fill here, or add entries below."
+    ? "No entries yet. Add work below."
     : "No unplanned entries yet.";
 
   return (
@@ -145,9 +146,8 @@ export function ReportEditor({ report }: ReportEditorProps) {
           <CardHeader>
             <CardTitle>From your plan</CardTitle>
             <CardDescription>
-              Check off completed items from your submitted plan. Each checked
-              item becomes a report entry — add hours and adjust the description
-              as needed.
+              Mark each plan item as completed, failed, or cancelled. Completed
+              items need hours logged below.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -257,22 +257,22 @@ function PlanChecklistRow({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const completedElsewhere =
-    item.completedAt !== null && item.completedInReportId !== currentReportId;
-  const checked = completedElsewhere || entry !== null;
-  const disabled = readOnly || completedElsewhere || isPending;
+  const resolvedElsewhere =
+    item.outcome !== PlanItemOutcome.OPEN &&
+    item.completedInReportId !== currentReportId;
+  const currentOutcome =
+    entry?.planItemOutcome ??
+    (entry ? PlanItemOutcome.COMPLETED : PlanItemOutcome.OPEN);
+  const disabled = readOnly || resolvedElsewhere || isPending;
 
-  const handleToggle = () => {
+  const handleOutcomeChange = (outcome: PlanItemOutcome) => {
     if (disabled) {
       return;
     }
 
     setError(null);
     startTransition(async () => {
-      const result = entry
-        ? await uncheckPlanItemAction(reportId, item.id)
-        : await checkOffPlanItemAction(reportId, item.id);
-
+      const result = await setPlanItemOutcomeAction(reportId, item.id, outcome);
       if (result.error) {
         setError(result.error);
         return;
@@ -284,26 +284,17 @@ function PlanChecklistRow({
   return (
     <li className="px-4 py-3">
       <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={handleToggle}
-          disabled={disabled}
-          aria-pressed={checked}
-          aria-label={`${checked ? "Uncheck" : "Check off"} ${item.title}`}
-          className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border border-input bg-background transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 data-[checked=true]:border-primary data-[checked=true]:bg-primary data-[checked=true]:text-primary-foreground"
-          data-checked={checked}
-        >
-          {checked ? <Check className="size-3.5" /> : null}
-        </button>
-
         <div className="min-w-0 flex-1 space-y-2">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{item.title}</span>
               <VisibilityBadge visibility={item.visibility} />
-              {completedElsewhere ? (
+              {resolvedElsewhere ? (
+                <PlanItemOutcomeBadge outcome={item.outcome} />
+              ) : null}
+              {resolvedElsewhere ? (
                 <span className="text-xs text-muted-foreground">
-                  Completed in another report
+                  Resolved in another report
                 </span>
               ) : null}
             </div>
@@ -312,12 +303,52 @@ function PlanChecklistRow({
             ) : null}
           </div>
 
-          {entry ? (
+          {!resolvedElsewhere && !readOnly ? (
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  PlanItemOutcome.OPEN,
+                  PlanItemOutcome.COMPLETED,
+                  PlanItemOutcome.FAILED,
+                  PlanItemOutcome.CANCELLED,
+                ] as const
+              ).map((outcome) => (
+                <Button
+                  key={outcome}
+                  type="button"
+                  size="sm"
+                  variant={currentOutcome === outcome ? "default" : "outline"}
+                  onClick={() => handleOutcomeChange(outcome)}
+                  disabled={disabled}
+                >
+                  {outcome === PlanItemOutcome.OPEN
+                    ? "Open"
+                    : outcome === PlanItemOutcome.COMPLETED
+                      ? "Completed"
+                      : outcome === PlanItemOutcome.FAILED
+                        ? "Failed"
+                        : "Cancelled"}
+                </Button>
+              ))}
+            </div>
+          ) : resolvedElsewhere || readOnly ? (
+            <PlanItemOutcomeBadge outcome={item.outcome} />
+          ) : null}
+
+          {entry && currentOutcome === PlanItemOutcome.COMPLETED ? (
             <ReportEntryFields
               reportId={reportId}
               entry={entry}
               readOnly={readOnly}
             />
+          ) : entry &&
+            (currentOutcome === PlanItemOutcome.FAILED ||
+              currentOutcome === PlanItemOutcome.CANCELLED) ? (
+            <p className="text-sm text-muted-foreground">
+              {currentOutcome === PlanItemOutcome.FAILED
+                ? "Tried but did not succeed — no hours required."
+                : "Decided not to pursue — no hours required."}
+            </p>
           ) : null}
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -763,10 +794,14 @@ function ReportActions({
   const [error, setError] = useState<string | null>(null);
 
   const hasEntries = entries.length > 0;
-  const allEntriesHaveHours = entries.every(
-    (entry) => Number(entry.hours) > 0,
-  );
-  const canSubmit = hasEntries && allEntriesHaveHours && periodEditable;
+  const allEntriesValid = entries.every((entry) => {
+    const hours = Number(entry.hours);
+    const outcome = entry.planItemOutcome ?? PlanItemOutcome.COMPLETED;
+    const requiresHours =
+      !entry.planItemId || outcome === PlanItemOutcome.COMPLETED;
+    return !requiresHours || (Number.isFinite(hours) && hours > 0);
+  });
+  const canSubmit = hasEntries && allEntriesValid && periodEditable;
 
   const handleSubmit = () => {
     setError(null);
@@ -791,7 +826,7 @@ function ReportActions({
   };
 
   if (status === SubmissionStatus.SUBMITTED) {
-    const checkedCount = matchingPlan
+    const resolvedCount = matchingPlan
       ? matchingPlan.items.filter(
           (item) =>
             item.completedInReportId === reportId ||
@@ -809,7 +844,7 @@ function ReportActions({
           </div>
           {matchingPlan && planItemCount > 0 ? (
             <p className="text-sm text-muted-foreground">
-              Plan checklist: {checkedCount}/{planItemCount} items completed in
+              Plan checklist: {resolvedCount}/{planItemCount} items resolved in
               this report.
             </p>
           ) : null}
@@ -851,9 +886,9 @@ function ReportActions({
         <p className="text-sm text-muted-foreground">
           {!hasEntries
             ? "Add at least one report entry before you can submit."
-            : !allEntriesHaveHours
-              ? "Every entry needs hours greater than zero before you can submit."
-              : "Submit when ready — checked plan items will be marked complete and public entries will be visible to your team."}
+            : !allEntriesValid
+              ? "Completed items and unplanned entries need hours greater than zero."
+              : "Submit when ready — plan outcomes will be saved and public entries will be visible to your team."}
         </p>
         <Button
           type="button"

@@ -18,7 +18,8 @@ async function signOutAction() {
 function buildNavLinks(role: Role, dict: Dictionary): DashboardNavLink[] {
   const links: DashboardNavLink[] = [
     { href: "/", label: dict.nav.home, icon: "home" },
-    { href: "/dashboard", label: dict.nav.dashboard, icon: "dashboard" },
+    { href: "/my-feed", label: dict.nav.myFeed, icon: "myFeed" },
+    { href: "/dashboard", label: dict.nav.teamFeed, icon: "teamFeed" },
   ];
 
   if (canManageUsers({ role })) {

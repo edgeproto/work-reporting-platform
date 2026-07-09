@@ -1,12 +1,11 @@
 import { Prisma } from "@/app/generated/prisma/client";
-import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
+import { PeriodType, PlanItemOutcome, SubmissionStatus } from "@/app/generated/prisma/enums";
 import { db } from "@/lib/db";
 import {
-  clearPlanItemCompletionForReport,
-  completePlanItemsFromReport,
+  applyPlanItemOutcomesFromReport,
+  clearPlanItemOutcomesForReport,
 } from "@/lib/plans/complete-items";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
-import { prefillWeeklyMonthlyReportFromDailyEntries } from "@/lib/reports/create-draft";
 import { canEditPeriod, getPeriodBounds } from "@/lib/periods";
 import {
   deleteAttachmentsForReport,
@@ -52,15 +51,14 @@ export async function createReportForPeriod(
     update: {},
   });
 
-  if (type !== PeriodType.DAILY) {
-    await prefillWeeklyMonthlyReportFromDailyEntries(
-      report.id,
-      userId,
-      organizationId,
-    );
-  }
-
   return report;
+}
+
+async function touchReportUpdated(reportId: string) {
+  await db.report.update({
+    where: { id: reportId },
+    data: { updatedAt: new Date() },
+  });
 }
 
 export async function checkOffPlanItem(
@@ -91,8 +89,8 @@ export async function checkOffPlanItem(
     throw new Error("Plan item not found on your submitted plan.");
   }
 
-  if (planItem.completedAt) {
-    throw new Error("This plan item was already completed in another report.");
+  if (planItem.outcome !== PlanItemOutcome.OPEN) {
+    throw new Error("This plan item was already resolved in another report.");
   }
 
   const existing = await db.reportEntry.findFirst({
@@ -108,7 +106,7 @@ export async function checkOffPlanItem(
     _max: { sortOrder: true },
   });
 
-  return db.reportEntry.create({
+  const entry = await db.reportEntry.create({
     data: {
       reportId,
       planItemId,
@@ -116,9 +114,12 @@ export async function checkOffPlanItem(
       description: planItem.description,
       hours: new Prisma.Decimal(0),
       visibility: planItem.visibility,
+      planItemOutcome: PlanItemOutcome.COMPLETED,
       sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
     },
   });
+  await touchReportUpdated(reportId);
+  return entry;
 }
 
 export async function uncheckPlanItem(
@@ -143,6 +144,86 @@ export async function uncheckPlanItem(
     entry.id,
   );
   await db.reportEntry.delete({ where: { id: entry.id } });
+  await touchReportUpdated(reportId);
+}
+
+export async function setPlanItemOutcomeInReport(
+  reportId: string,
+  planItemId: string,
+  outcome: PlanItemOutcome,
+  userId: string,
+  organizationId: string,
+) {
+  if (outcome === PlanItemOutcome.OPEN) {
+    await uncheckPlanItem(reportId, planItemId, userId, organizationId);
+    return null;
+  }
+
+  if (outcome === PlanItemOutcome.COMPLETED) {
+    return checkOffPlanItem(reportId, planItemId, userId, organizationId);
+  }
+
+  const report = await assertEditableReport(reportId, userId, organizationId);
+
+  const planItem = await db.planItem.findFirst({
+    where: {
+      id: planItemId,
+      plan: {
+        userId,
+        organizationId,
+        type: report.type,
+        periodStart: report.periodStart,
+        status: SubmissionStatus.SUBMITTED,
+      },
+    },
+    include: {
+      taskTitle: { select: { title: true } },
+    },
+  });
+
+  if (!planItem) {
+    throw new Error("Plan item not found on your submitted plan.");
+  }
+
+  if (planItem.outcome !== PlanItemOutcome.OPEN) {
+    throw new Error("This plan item was already resolved in another report.");
+  }
+
+  const existing = await db.reportEntry.findFirst({
+    where: { reportId, planItemId },
+  });
+
+  if (existing) {
+    const updated = await db.reportEntry.update({
+      where: { id: existing.id },
+      data: {
+        planItemOutcome: outcome,
+        hours: new Prisma.Decimal(0),
+      },
+    });
+    await touchReportUpdated(reportId);
+    return updated;
+  }
+
+  const maxSort = await db.reportEntry.aggregate({
+    where: { reportId },
+    _max: { sortOrder: true },
+  });
+
+  const entry = await db.reportEntry.create({
+    data: {
+      reportId,
+      planItemId,
+      customTitle: getPlanItemTitle(planItem),
+      description: planItem.description,
+      hours: new Prisma.Decimal(0),
+      visibility: planItem.visibility,
+      planItemOutcome: outcome,
+      sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
+    },
+  });
+  await touchReportUpdated(reportId);
+  return entry;
 }
 
 export async function addUnplannedEntry(
@@ -163,7 +244,7 @@ export async function addUnplannedEntry(
     _max: { sortOrder: true },
   });
 
-  return db.reportEntry.create({
+  const entry = await db.reportEntry.create({
     data: {
       reportId,
       customTitle: title,
@@ -173,6 +254,8 @@ export async function addUnplannedEntry(
       sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
     },
   });
+  await touchReportUpdated(reportId);
+  return entry;
 }
 
 export async function updateReportEntry(
@@ -192,7 +275,7 @@ export async function updateReportEntry(
     throw new Error("Report entry not found.");
   }
 
-  return db.reportEntry.update({
+  const updated = await db.reportEntry.update({
     where: { id: entryId },
     data: {
       description: input.description?.trim() || null,
@@ -200,6 +283,8 @@ export async function updateReportEntry(
       visibility: input.visibility,
     },
   });
+  await touchReportUpdated(reportId);
+  return updated;
 }
 
 export async function deleteReportEntry(
@@ -228,6 +313,7 @@ export async function deleteReportEntry(
     entryId,
   );
   await db.reportEntry.delete({ where: { id: entryId } });
+  await touchReportUpdated(reportId);
 }
 
 export async function submitReport(
@@ -239,7 +325,7 @@ export async function submitReport(
 
   const entries = await db.reportEntry.findMany({
     where: { reportId },
-    select: { id: true, hours: true },
+    select: { id: true, hours: true, planItemId: true, planItemOutcome: true },
   });
 
   if (entries.length === 0) {
@@ -248,18 +334,27 @@ export async function submitReport(
 
   for (const entry of entries) {
     const hours = Number(entry.hours);
-    if (!Number.isFinite(hours) || hours <= 0) {
-      throw new Error("Every entry must have hours greater than zero.");
+    const outcome = entry.planItemOutcome ?? PlanItemOutcome.COMPLETED;
+    const requiresHours =
+      !entry.planItemId || outcome === PlanItemOutcome.COMPLETED;
+
+    if (requiresHours && (!Number.isFinite(hours) || hours <= 0)) {
+      throw new Error(
+        entry.planItemId
+          ? "Completed plan items need hours greater than zero."
+          : "Every entry must have hours greater than zero.",
+      );
     }
   }
 
-  await completePlanItemsFromReport(report.id);
+  await applyPlanItemOutcomesFromReport(report.id);
 
   return db.report.update({
     where: { id: report.id },
     data: {
       status: SubmissionStatus.SUBMITTED,
       submittedAt: new Date(),
+      updatedAt: new Date(),
     },
   });
 }
@@ -277,7 +372,7 @@ export async function deleteReport(
     throw new Error("Report not found.");
   }
 
-  await clearPlanItemCompletionForReport(reportId);
+  await clearPlanItemOutcomesForReport(reportId);
   await deleteAttachmentsForReport(organizationId, reportId);
   await db.report.delete({ where: { id: report.id } });
 }

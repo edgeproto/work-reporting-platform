@@ -30,7 +30,7 @@ function serializePlan(
       title: getPlanItemTitle(item),
       description: item.description,
       visibility: item.visibility,
-      completedAt: item.completedAt?.toISOString() ?? null,
+      outcome: item.outcome,
       attachments: item.attachments.map((attachment) => ({
         id: attachment.id,
         fileName: attachment.fileName,

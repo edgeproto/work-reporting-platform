@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   LayoutDashboard,
+  Newspaper,
   Settings,
   Users,
   type LucideIcon,
@@ -15,12 +16,13 @@ import { cn } from "@/lib/utils";
 export type DashboardNavLink = {
   href: string;
   label: string;
-  icon?: "home" | "dashboard" | "users" | "settings";
+  icon?: "home" | "myFeed" | "teamFeed" | "users" | "settings";
 };
 
 const ICONS: Record<NonNullable<DashboardNavLink["icon"]>, LucideIcon> = {
   home: Home,
-  dashboard: LayoutDashboard,
+  myFeed: Newspaper,
+  teamFeed: LayoutDashboard,
   users: Users,
   settings: Settings,
 };

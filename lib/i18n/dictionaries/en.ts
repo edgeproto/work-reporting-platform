@@ -8,7 +8,8 @@ export type Dictionary = {
   };
   nav: {
     home: string;
-    dashboard: string;
+    myFeed: string;
+    teamFeed: string;
     users: string;
     settings: string;
   };
@@ -38,7 +39,8 @@ export const en: Dictionary = {
   },
   nav: {
     home: "Home",
-    dashboard: "Dashboard",
+    myFeed: "My Feed",
+    teamFeed: "Team Feed",
     users: "Users",
     settings: "Settings",
   },

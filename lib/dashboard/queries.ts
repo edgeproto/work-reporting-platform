@@ -1,15 +1,14 @@
-import {
-  PeriodType,
-  Role,
-  SubmissionStatus,
-  Visibility,
-} from "@/app/generated/prisma/enums";
+import "server-only";
+
+import { PeriodType, PlanItemOutcome, Role, SubmissionStatus, Visibility } from "@/app/generated/prisma/enums";
+import type { DashboardFilters } from "@/lib/dashboard/filters";
+import type {
+  FilingTimestamps,
+  MemberRosterRow,
+  RosterPlanLine,
+  RosterReportLine,
+} from "@/lib/dashboard/types";
 import { db } from "@/lib/db";
-import {
-  getPeriodBounds,
-  parseDateString,
-  todayDateString,
-} from "@/lib/periods";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { getReportEntryTitle } from "@/lib/reports/entry-title";
 import { isAdmin, isManagerOrAbove } from "@/lib/rbac";
@@ -33,95 +32,21 @@ function ownerFilterForViewer(viewer: Viewer) {
   return isAdmin(viewer) ? {} : { user: { role: { not: Role.ADMIN } } };
 }
 
-export type DashboardRangePreset = "week" | "month" | "custom";
-
-export type DashboardSearchParams = {
-  range?: string;
-  from?: string;
-  to?: string;
-  sort?: string;
-  dir?: string;
-};
-
-export type DashboardSortKey = "name" | "completion" | "hours";
-export type DashboardSortDir = "asc" | "desc";
-
-export type DashboardFilters = {
-  dateFrom: Date;
-  dateTo: Date;
-  rangePreset: DashboardRangePreset;
-  sort: DashboardSortKey;
-  dir: DashboardSortDir;
-};
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const VALID_RANGES = new Set(["week", "month", "custom"]);
-const VALID_SORT = new Set(["name", "completion", "hours"]);
-const VALID_DIR = new Set(["asc", "desc"]);
-
-export function parseDashboardFilters(
-  params: DashboardSearchParams,
-): DashboardFilters {
-  const rangePreset: DashboardRangePreset = VALID_RANGES.has(params.range ?? "")
-    ? (params.range as DashboardRangePreset)
-    : "week";
-
-  const { dateFrom, dateTo } = resolveDateRange(
-    rangePreset,
-    params.from,
-    params.to,
-  );
-
-  const sort: DashboardSortKey = VALID_SORT.has(params.sort ?? "")
-    ? (params.sort as DashboardSortKey)
-    : "name";
-  const dir: DashboardSortDir = VALID_DIR.has(params.dir ?? "")
-    ? (params.dir as DashboardSortDir)
-    : sort === "name"
-      ? "asc"
-      : "desc";
-
-  return { dateFrom, dateTo, rangePreset, sort, dir };
-}
-
-function resolveDateRange(
-  preset: DashboardRangePreset,
-  from?: string,
-  to?: string,
-): { dateFrom: Date; dateTo: Date } {
-  const today = todayDateString();
-
-  if (preset === "custom" && from && to && DATE_RE.test(from) && DATE_RE.test(to)) {
-    return {
-      dateFrom: parseDateString(from),
-      dateTo: parseDateString(to),
-    };
-  }
-
-  if (preset === "month") {
-    const bounds = getPeriodBounds(PeriodType.MONTHLY, today);
-    return { dateFrom: bounds.periodStart, dateTo: bounds.periodEnd };
-  }
-
-  const bounds = getPeriodBounds(PeriodType.WEEKLY, today);
-  return { dateFrom: bounds.periodStart, dateTo: bounds.periodEnd };
-}
-
 type Viewer = {
   id: string;
   role: Role;
   organizationId: string;
 };
 
-export type MemberRosterRow = {
-  id: string;
-  name: string;
-  role: Role;
-  planItemCount: number;
-  completedCount: number;
-  completionPct: number | null;
-  hours: number;
-};
+function serializeTimestamps(
+  submittedAt: Date | null,
+  updatedAt: Date,
+): FilingTimestamps {
+  return {
+    submittedAt: submittedAt?.toISOString() ?? null,
+    updatedAt: updatedAt.toISOString(),
+  };
+}
 
 export async function fetchMemberRoster(
   viewer: Viewer,
@@ -137,93 +62,86 @@ export async function fetchMemberRoster(
     canViewUserOnDashboard(viewer, member),
   );
 
-  const managerView = isManagerOrAbove(viewer);
   const ownerFilter = ownerFilterForViewer(viewer);
 
-  const [planItems, reportEntries] = await Promise.all([
-    db.planItem.findMany({
+  const [plans, reports] = await Promise.all([
+    db.plan.findMany({
       where: {
-        plan: {
-          organizationId: viewer.organizationId,
-          status: SubmissionStatus.SUBMITTED,
-          periodStart: { gte: filters.dateFrom, lte: filters.dateTo },
-          ...ownerFilter,
-        },
-        ...(managerView
-          ? {}
-          : {
-              OR: [
-                { visibility: Visibility.PUBLIC },
-                { plan: { userId: viewer.id } },
-              ],
-            }),
+        organizationId: viewer.organizationId,
+        type: filters.periodType,
+        periodStart: filters.periodStart,
+        status: SubmissionStatus.SUBMITTED,
+        ...ownerFilter,
       },
-      select: {
-        completedAt: true,
-        visibility: true,
-        plan: { select: { userId: true } },
+      include: {
+        user: { select: { id: true } },
+        items: {
+          orderBy: { sortOrder: "asc" },
+          include: { taskTitle: { select: { title: true } } },
+        },
       },
     }),
-    db.reportEntry.findMany({
+    db.report.findMany({
       where: {
-        report: {
-          organizationId: viewer.organizationId,
-          status: SubmissionStatus.SUBMITTED,
-          periodStart: { gte: filters.dateFrom, lte: filters.dateTo },
-          ...ownerFilter,
-        },
-        ...(managerView
-          ? {}
-          : {
-              OR: [
-                { visibility: Visibility.PUBLIC },
-                { report: { userId: viewer.id } },
-              ],
-            }),
+        organizationId: viewer.organizationId,
+        type: filters.periodType,
+        periodStart: filters.periodStart,
+        status: SubmissionStatus.SUBMITTED,
+        ...ownerFilter,
       },
-      select: {
-        hours: true,
-        visibility: true,
-        report: { select: { userId: true } },
+      include: {
+        user: { select: { id: true } },
+        entries: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            taskTitle: { select: { title: true } },
+            planItem: {
+              select: {
+                customTitle: true,
+                taskTitle: { select: { title: true } },
+              },
+            },
+          },
+        },
       },
     }),
   ]);
 
+  const planByUser = new Map(plans.map((plan) => [plan.userId, plan]));
+  const reportByUser = new Map(reports.map((report) => [report.userId, report]));
+
   const rows: MemberRosterRow[] = visibleMembers.map((member) => {
-    const memberPlanItems = planItems.filter((item) => {
-      if (item.plan.userId !== member.id) {
-        return false;
-      }
-      if (
-        item.visibility === Visibility.PRIVATE &&
-        !canViewPrivate(viewer, member.id, viewer.id)
-      ) {
-        return false;
-      }
-      return true;
-    });
+    const plan = planByUser.get(member.id);
+    const report = reportByUser.get(member.id);
+    const canSeePrivate = canViewPrivate(viewer, member.id, viewer.id);
 
-    const memberEntries = reportEntries.filter((entry) => {
-      if (entry.report.userId !== member.id) {
-        return false;
-      }
-      if (
-        entry.visibility === Visibility.PRIVATE &&
-        !canViewPrivate(viewer, member.id, viewer.id)
-      ) {
-        return false;
-      }
-      return true;
-    });
+    const planLines: RosterPlanLine[] = (plan?.items ?? [])
+      .filter(
+        (item) =>
+          canSeePrivate || item.visibility === Visibility.PUBLIC,
+      )
+      .map((item) => ({
+        title: getPlanItemTitle(item),
+        visibility: item.visibility,
+        outcome: item.outcome,
+      }));
 
-    const planItemCount = memberPlanItems.length;
-    const completedCount = memberPlanItems.filter(
-      (item) => item.completedAt != null,
+    const reportLines: RosterReportLine[] = (report?.entries ?? [])
+      .filter(
+        (entry) =>
+          canSeePrivate || entry.visibility === Visibility.PUBLIC,
+      )
+      .map((entry) => ({
+        title: getReportEntryTitle(entry),
+        hours: Number(entry.hours) || 0,
+        visibility: entry.visibility,
+      }));
+
+    const planItemCount = planLines.length;
+    const completedCount = planLines.filter(
+      (line) => line.outcome === PlanItemOutcome.COMPLETED,
     ).length;
-    const hours = memberEntries.reduce(
-      (sum, entry) => sum + (Number(entry.hours) || 0),
-      0,
-    );
+    const hours = reportLines.reduce((sum, line) => sum + line.hours, 0);
 
     return {
       id: member.id,
@@ -236,6 +154,14 @@ export async function fetchMemberRoster(
           ? null
           : Math.round((completedCount / planItemCount) * 1000) / 10,
       hours,
+      planLines,
+      reportLines,
+      planTimestamps: plan
+        ? serializeTimestamps(plan.submittedAt, plan.updatedAt)
+        : null,
+      reportTimestamps: report
+        ? serializeTimestamps(report.submittedAt, report.updatedAt)
+        : null,
     };
   });
 
@@ -261,26 +187,28 @@ export async function fetchMemberRoster(
 export type MemberDetailData = {
   member: { id: string; name: string; role: Role };
   filters: DashboardFilters;
-  plans: Array<{
+  plan: {
     id: string;
     type: PeriodType;
     periodStart: Date;
     periodEnd: Date;
     submittedAt: Date | null;
+    updatedAt: Date;
     items: Array<{
       id: string;
       title: string;
       description: string | null;
       visibility: Visibility;
-      completed: boolean;
+      outcome: PlanItemOutcome;
     }>;
-  }>;
-  reports: Array<{
+  } | null;
+  report: {
     id: string;
     type: PeriodType;
     periodStart: Date;
     periodEnd: Date;
     submittedAt: Date | null;
+    updatedAt: Date;
     entries: Array<{
       id: string;
       title: string;
@@ -288,7 +216,7 @@ export type MemberDetailData = {
       hours: number;
       visibility: Visibility;
     }>;
-  }>;
+  } | null;
   completionPct: number | null;
   totalHours: number;
 };
@@ -317,13 +245,14 @@ export async function fetchMemberDetail(
 
   const canSeePrivate = canViewPrivate(viewer, member.id, viewer.id);
 
-  const [plans, reports] = await Promise.all([
-    db.plan.findMany({
+  const [plan, report] = await Promise.all([
+    db.plan.findFirst({
       where: {
         userId: member.id,
         organizationId: viewer.organizationId,
+        type: filters.periodType,
+        periodStart: filters.periodStart,
         status: SubmissionStatus.SUBMITTED,
-        periodStart: { gte: filters.dateFrom, lte: filters.dateTo },
       },
       include: {
         items: {
@@ -332,14 +261,14 @@ export async function fetchMemberDetail(
           include: { taskTitle: { select: { title: true } } },
         },
       },
-      orderBy: [{ periodStart: "desc" }],
     }),
-    db.report.findMany({
+    db.report.findFirst({
       where: {
         userId: member.id,
         organizationId: viewer.organizationId,
+        type: filters.periodType,
+        periodStart: filters.periodStart,
         status: SubmissionStatus.SUBMITTED,
-        periodStart: { gte: filters.dateFrom, lte: filters.dateTo },
       },
       include: {
         entries: {
@@ -356,61 +285,60 @@ export async function fetchMemberDetail(
           },
         },
       },
-      orderBy: [{ periodStart: "desc" }],
     }),
   ]);
 
-  let completedCount = 0;
-  let planItemCount = 0;
-  let totalHours = 0;
-
-  const serializedPlans = plans.map((plan) => {
-    planItemCount += plan.items.length;
-    completedCount += plan.items.filter((item) => item.completedAt).length;
-    return {
-      id: plan.id,
-      type: plan.type,
-      periodStart: plan.periodStart,
-      periodEnd: plan.periodEnd,
-      submittedAt: plan.submittedAt,
-      items: plan.items.map((item) => ({
-        id: item.id,
-        title: getPlanItemTitle(item),
-        description: item.description,
-        visibility: item.visibility,
-        completed: item.completedAt != null,
-      })),
-    };
-  });
-
-  const serializedReports = reports.map((report) => ({
-    id: report.id,
-    type: report.type,
-    periodStart: report.periodStart,
-    periodEnd: report.periodEnd,
-    submittedAt: report.submittedAt,
-    entries: report.entries.map((entry) => {
-      const hours = Number(entry.hours) || 0;
-      totalHours += hours;
-      return {
-        id: entry.id,
-        title: getReportEntryTitle(entry),
-        description: entry.description,
-        hours,
-        visibility: entry.visibility,
-      };
-    }),
-  }));
+  const planItems = plan?.items ?? [];
+  const reportEntries = report?.entries ?? [];
+  const completedCount = planItems.filter(
+    (item) => item.outcome === PlanItemOutcome.COMPLETED,
+  ).length;
+  const totalHours = reportEntries.reduce(
+    (sum, entry) => sum + (Number(entry.hours) || 0),
+    0,
+  );
 
   return {
     member,
     filters,
-    plans: serializedPlans,
-    reports: serializedReports,
+    plan: plan
+      ? {
+          id: plan.id,
+          type: plan.type,
+          periodStart: plan.periodStart,
+          periodEnd: plan.periodEnd,
+          submittedAt: plan.submittedAt,
+          updatedAt: plan.updatedAt,
+          items: planItems.map((item) => ({
+            id: item.id,
+            title: getPlanItemTitle(item),
+            description: item.description,
+            visibility: item.visibility,
+            outcome: item.outcome,
+          })),
+        }
+      : null,
+    report: report
+      ? {
+          id: report.id,
+          type: report.type,
+          periodStart: report.periodStart,
+          periodEnd: report.periodEnd,
+          submittedAt: report.submittedAt,
+          updatedAt: report.updatedAt,
+          entries: reportEntries.map((entry) => ({
+            id: entry.id,
+            title: getReportEntryTitle(entry),
+            description: entry.description,
+            hours: Number(entry.hours) || 0,
+            visibility: entry.visibility,
+          })),
+        }
+      : null,
     completionPct:
-      planItemCount === 0
+      planItems.length === 0
         ? null
-        : Math.round((completedCount / planItemCount) * 1000) / 10,
+        : Math.round((completedCount / planItems.length) * 1000) / 10,
     totalHours,
   };
 }
