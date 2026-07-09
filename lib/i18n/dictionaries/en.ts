@@ -17,6 +17,18 @@ export type Dictionary = {
     signingIn: string;
     loading: string;
     passwordSetSuccess: string;
+    setPassword: {
+      title: string;
+      welcome: string;
+      confirmPassword: string;
+      button: string;
+      unableTitle: string;
+      tokenInvalid: string;
+      tokenUsed: string;
+      tokenUsedSignIn: string;
+      tokenExpired: string;
+      tokenInactive: string;
+    };
   };
   common: {
     plan: string;
@@ -37,6 +49,14 @@ export type Dictionary = {
     more: string;
     expandAll: string;
     collapseAll: string;
+    editItem: string;
+    deleteItem: string;
+    removeFile: string;
+    expandItem: string;
+    collapseItem: string;
+    fileSizeB: string;
+    fileSizeKB: string;
+    fileSizeMB: string;
   };
   periods: {
     type: { daily: string; weekly: string; monthly: string };
@@ -208,6 +228,149 @@ export type Dictionary = {
     submit: string;
     deleteConfirm: string;
     deleteAria: string;
+    checkOffItem: string;
+  };
+  shell: {
+    expandSidebar: string;
+    collapseSidebar: string;
+    mainNav: string;
+  };
+  navEditor: {
+    backToHome: string;
+  };
+  admin: {
+    usersTitle: string;
+    usersDescription: string;
+    createUserTitle: string;
+    createUserDescription: string;
+    creating: string;
+    createUser: string;
+    copied: string;
+    copyLink: string;
+    linkCreatedTitle: string;
+    linkCreatedDescription: string;
+    teamMembers: string;
+    userCountOne: string;
+    userCountMany: string;
+    noUsers: string;
+    inactive: string;
+    passwordSet: string;
+    awaitingPassword: string;
+    you: string;
+    deactivate: string;
+    activate: string;
+    regenerate: string;
+    generateLink: string;
+    linkExpires: string;
+    roleFor: string;
+    organizationTitle: string;
+    organizationDescription: string;
+    slug: string;
+    slugFixed: string;
+    saveChanges: string;
+    settingsSaved: string;
+    appUrlTitle: string;
+    appUrlDescription: string;
+    appUrlHint: string;
+  };
+  errors: {
+    generic: string;
+    invalidInput: string;
+    invalidEmailOrPassword: string;
+    unableToSignIn: string;
+    invalidPlanParameters: string;
+    invalidReportParameters: string;
+    invalidDate: string;
+    invalidMonth: string;
+    invalidWeek: string;
+    invalidDay: string;
+    invalidRole: string;
+    invalidOrganizationName: string;
+    unauthorized: string;
+    noFileSelected: string;
+    notesTooLong: string;
+    outsideEditWindow: string;
+    unableToSaveNotes: string;
+    unableToAddItem: string;
+    unableToUpdateItem: string;
+    unableToDeleteItem: string;
+    unableToSubmitPlan: string;
+    unableToReopenPlan: string;
+    unableToDeletePlan: string;
+    unableToUploadFile: string;
+    unableToDeleteAttachment: string;
+    unableToCheckOffItem: string;
+    unableToUncheckItem: string;
+    unableToUpdatePlanItem: string;
+    unableToAddEntry: string;
+    unableToUpdateEntry: string;
+    unableToDeleteEntry: string;
+    unableToSubmitReport: string;
+    unableToOpenTomorrowsPlan: string;
+    unableToDeleteReport: string;
+    unableToOpenPlan: string;
+    unableToOpenReport: string;
+    unableToUpdateProfile: string;
+    unableToChangePassword: string;
+    unableToUploadAvatar: string;
+    unableToRemoveAvatar: string;
+    unableToCreateUser: string;
+    unableToUpdateRole: string;
+    unableToUpdateUserStatus: string;
+    unableToGeneratePasswordLink: string;
+    unableToUpdateOrganizationSettings: string;
+    nameRequired: string;
+    emailRequired: string;
+    invalidEmailAddress: string;
+    passwordRequired: string;
+    passwordMinLength: string;
+    passwordsDoNotMatch: string;
+    currentPasswordRequired: string;
+    confirmPasswordRequired: string;
+    organizationNameRequired: string;
+    titleRequired: string;
+    invalidDateFormat: string;
+    hoursCannotBeNegative: string;
+    hoursCannotExceed24: string;
+    hoursMustBeGreaterThanZero: string;
+    linkExpired: string;
+    linkUsed: string;
+    linkInactive: string;
+    invalidPasswordSetLink: string;
+    planItemNotFound: string;
+    planCannotBeEdited: string;
+    resolvedItemsCannotBeEdited: string;
+    submittedPlansCannotBeEdited: string;
+    addPlanItemBeforeSubmit: string;
+    planNotFound: string;
+    onlySubmittedPlansCanBeReopened: string;
+    planItemNotOnPlan: string;
+    planItemResolvedElsewhere: string;
+    reportEntryNotFound: string;
+    uncheckToRemoveEntry: string;
+    addReportEntryBeforeSubmit: string;
+    completedItemsNeedHours: string;
+    entriesNeedHours: string;
+    reportNotFound: string;
+    submittedReportsCannotBeEdited: string;
+    userNotFound: string;
+    emailAlreadyExists: string;
+    noPasswordSetUseLink: string;
+    currentPasswordIncorrect: string;
+    selectImageFile: string;
+    avatarInvalidType: string;
+    avatarExceedsMaxSize: string;
+    fileExceedsMaxSize: string;
+    fileNameRequired: string;
+    fileEmpty: string;
+    fileTypeNotAllowed: string;
+    cannotGenerateLinkInactive: string;
+    cannotChangeOwnRole: string;
+    cannotDeactivateSelf: string;
+    invalidWeekValue: string;
+    invalidMonthValue: string;
+    attachmentNotFound: string;
+    tomorrowPlanOutsideWindow: string;
   };
 };
 
@@ -231,6 +394,19 @@ export const en: Dictionary = {
     signingIn: "Signing in…",
     loading: "Loading…",
     passwordSetSuccess: "Password set successfully. You can sign in now.",
+    setPassword: {
+      title: "Set your password",
+      welcome: "Welcome, {name}. Create a password for {email}.",
+      confirmPassword: "Confirm password",
+      button: "Set password",
+      unableTitle: "Unable to set password",
+      tokenInvalid: "This password-set link is invalid.",
+      tokenUsed: "This link has already been used.",
+      tokenUsedSignIn:
+        "This link has already been used. Sign in or ask your admin for a new link.",
+      tokenExpired: "This link has expired. Ask your admin for a new one.",
+      tokenInactive: "This account is inactive. Contact your admin.",
+    },
   },
   common: {
     plan: "Plan",
@@ -251,6 +427,14 @@ export const en: Dictionary = {
     more: "more",
     expandAll: "Expand all",
     collapseAll: "Collapse all",
+    editItem: "Edit {title}",
+    deleteItem: "Delete {title}",
+    removeFile: "Remove {fileName}",
+    expandItem: "Expand {label}",
+    collapseItem: "Collapse {label}",
+    fileSizeB: "{size} B",
+    fileSizeKB: "{size} KB",
+    fileSizeMB: "{size} MB",
   },
   periods: {
     type: { daily: "Daily", weekly: "Weekly", monthly: "Monthly" },
@@ -451,5 +635,159 @@ export const en: Dictionary = {
     deleteConfirm:
       "Delete this report? All entries will be removed. Plan items completed by this report will be reopened. This cannot be undone.",
     deleteAria: "Delete report",
+    checkOffItem: "Check off {title}",
+  },
+  shell: {
+    expandSidebar: "Expand sidebar",
+    collapseSidebar: "Collapse sidebar",
+    mainNav: "Main",
+  },
+  navEditor: {
+    backToHome: "← Back to Home",
+  },
+  admin: {
+    usersTitle: "User Management",
+    usersDescription:
+      "Create users, assign roles, and share password-set links manually.",
+    createUserTitle: "Create user",
+    createUserDescription:
+      "New users receive a one-time password-set link to share manually.",
+    creating: "Creating…",
+    createUser: "Create user",
+    copied: "Copied",
+    copyLink: "Copy link",
+    linkCreatedTitle: "Password-set link created",
+    linkCreatedDescription:
+      "Share this link with the new user (Slack, Teams, in person, etc.).",
+    teamMembers: "Team members",
+    userCountOne: "{count} user in your organization",
+    userCountMany: "{count} users in your organization",
+    noUsers: "No users yet. Create the first account above.",
+    inactive: "Inactive",
+    passwordSet: "Password set",
+    awaitingPassword: "Awaiting password",
+    you: "You",
+    deactivate: "Deactivate",
+    activate: "Activate",
+    regenerate: "Regenerate",
+    generateLink: "Generate password-set link",
+    linkExpires: "Link expires {expiry}",
+    roleFor: "Role for {name}",
+    organizationTitle: "Organization",
+    organizationDescription: "Display name shown across the platform.",
+    slug: "Slug",
+    slugFixed: "Slug is fixed in v1 single-org mode.",
+    saveChanges: "Save changes",
+    settingsSaved: "Settings saved.",
+    appUrlTitle: "Application URL",
+    appUrlDescription:
+      "Base URL used when generating password-set links for new users.",
+    appUrlHint:
+      "Set APP_URL in your .env file (e.g. http://192.168.1.50:3000 for LAN access) and restart the app.",
+  },
+  errors: {
+    generic: "Something went wrong. Please try again.",
+    invalidInput: "Invalid input.",
+    invalidEmailOrPassword: "Invalid email or password.",
+    unableToSignIn: "Unable to sign in. Please try again.",
+    invalidPlanParameters: "Invalid plan parameters.",
+    invalidReportParameters: "Invalid report parameters.",
+    invalidDate: "Invalid date.",
+    invalidMonth: "Invalid month.",
+    invalidWeek: "Invalid week.",
+    invalidDay: "Invalid day.",
+    invalidRole: "Invalid role.",
+    invalidOrganizationName: "Invalid organization name.",
+    unauthorized: "Unauthorized",
+    noFileSelected: "No file selected.",
+    notesTooLong: "Notes are too long.",
+    outsideEditWindow: "This period is outside the edit window.",
+    unableToSaveNotes: "Unable to save notes.",
+    unableToAddItem: "Unable to add item.",
+    unableToUpdateItem: "Unable to update item.",
+    unableToDeleteItem: "Unable to delete item.",
+    unableToSubmitPlan: "Unable to submit plan.",
+    unableToReopenPlan: "Unable to reopen plan.",
+    unableToDeletePlan: "Unable to delete plan.",
+    unableToUploadFile: "Unable to upload file.",
+    unableToDeleteAttachment: "Unable to delete attachment.",
+    unableToCheckOffItem: "Unable to check off item.",
+    unableToUncheckItem: "Unable to uncheck item.",
+    unableToUpdatePlanItem: "Unable to update plan item.",
+    unableToAddEntry: "Unable to add entry.",
+    unableToUpdateEntry: "Unable to update entry.",
+    unableToDeleteEntry: "Unable to delete entry.",
+    unableToSubmitReport: "Unable to submit report.",
+    unableToOpenTomorrowsPlan: "Unable to open tomorrow’s plan.",
+    unableToDeleteReport: "Unable to delete report.",
+    unableToOpenPlan: "Unable to open plan.",
+    unableToOpenReport: "Unable to open report.",
+    unableToUpdateProfile: "Unable to update profile.",
+    unableToChangePassword: "Unable to change password.",
+    unableToUploadAvatar: "Unable to upload avatar.",
+    unableToRemoveAvatar: "Unable to remove avatar.",
+    unableToCreateUser: "Unable to create user.",
+    unableToUpdateRole: "Unable to update role.",
+    unableToUpdateUserStatus: "Unable to update user status.",
+    unableToGeneratePasswordLink: "Unable to generate password-set link.",
+    unableToUpdateOrganizationSettings: "Unable to update organization settings.",
+    nameRequired: "Name is required.",
+    emailRequired: "Email is required.",
+    invalidEmailAddress: "Invalid email address.",
+    passwordRequired: "Password is required.",
+    passwordMinLength: "Password must be at least 8 characters.",
+    passwordsDoNotMatch: "Passwords do not match.",
+    currentPasswordRequired: "Current password is required.",
+    confirmPasswordRequired: "Confirm your new password.",
+    organizationNameRequired: "Organization name is required.",
+    titleRequired: "Title is required.",
+    invalidDateFormat: "Invalid date format.",
+    hoursCannotBeNegative: "Hours cannot be negative.",
+    hoursCannotExceed24: "Hours cannot exceed 24 per entry.",
+    hoursMustBeGreaterThanZero: "Hours must be greater than zero.",
+    linkExpired: "This link has expired. Ask your admin for a new one.",
+    linkUsed: "This link has already been used.",
+    linkInactive: "This account is inactive.",
+    invalidPasswordSetLink: "Invalid password-set link.",
+    planItemNotFound: "Plan item not found.",
+    planCannotBeEdited: "This plan cannot be edited.",
+    resolvedItemsCannotBeEdited: "Resolved items cannot be edited.",
+    submittedPlansCannotBeEdited: "Submitted plans cannot be edited.",
+    addPlanItemBeforeSubmit: "Add at least one plan item before submitting.",
+    planNotFound: "Plan not found.",
+    onlySubmittedPlansCanBeReopened: "Only submitted plans can be reopened.",
+    planItemNotOnPlan: "Plan item not found on your submitted plan.",
+    planItemResolvedElsewhere:
+      "This plan item was already resolved in another report.",
+    reportEntryNotFound: "Report entry not found.",
+    uncheckToRemoveEntry: "Uncheck the plan item to remove this entry.",
+    addReportEntryBeforeSubmit:
+      "Add at least one report entry before submitting.",
+    completedItemsNeedHours:
+      "Completed plan items need hours greater than zero.",
+    entriesNeedHours: "Every entry must have hours greater than zero.",
+    reportNotFound: "Report not found.",
+    submittedReportsCannotBeEdited: "Submitted reports cannot be edited.",
+    userNotFound: "User not found.",
+    emailAlreadyExists: "A user with this email already exists.",
+    noPasswordSetUseLink:
+      "No password is set for this account. Use a password-set link from your admin.",
+    currentPasswordIncorrect: "Current password is incorrect.",
+    selectImageFile: "Select an image file.",
+    avatarInvalidType: "Avatar must be a JPEG, PNG, GIF, or WebP image.",
+    avatarExceedsMaxSize: "Avatar exceeds maximum size of {mb} MB.",
+    fileExceedsMaxSize: "File exceeds maximum size of {mb} MB.",
+    fileNameRequired: "File name is required.",
+    fileEmpty: "File is empty.",
+    fileTypeNotAllowed:
+      "File type not allowed. Use PDF, images, Office documents, or plain text.",
+    cannotGenerateLinkInactive: "Cannot generate a link for an inactive user.",
+    cannotChangeOwnRole: "You cannot change your own role.",
+    cannotDeactivateSelf: "You cannot deactivate your own account.",
+    invalidWeekValue: "Invalid week value.",
+    invalidMonthValue: "Invalid month value.",
+    attachmentNotFound: "Attachment not found.",
+    tomorrowPlanOutsideWindow:
+      "Tomorrow’s plan is outside the daily edit window.",
   },
 };

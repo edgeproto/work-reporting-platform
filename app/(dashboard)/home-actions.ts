@@ -7,6 +7,10 @@ import { z } from "zod";
 import { PeriodType } from "@/app/generated/prisma/enums";
 import { requireSession } from "@/lib/auth";
 import {
+  actionError,
+  getActionDictionary,
+} from "@/lib/i18n/action-dictionary";
+import {
   setHomeDayCookie,
   setHomeMonthCookie,
   setHomeWeekCookie,
@@ -26,9 +30,10 @@ export type HomeActionResult = {
 const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
 
 export async function setHomeMonthAction(month: string): Promise<HomeActionResult> {
+  const dict = await getActionDictionary();
   const parsed = monthSchema.safeParse(month);
   if (!parsed.success) {
-    return { error: "Invalid month." };
+    return { error: dict.errors.invalidMonth };
   }
   await setHomeMonthCookie(parsed.data);
   revalidatePath("/");
@@ -36,9 +41,10 @@ export async function setHomeMonthAction(month: string): Promise<HomeActionResul
 }
 
 export async function setHomeWeekAction(weekSunday: string): Promise<HomeActionResult> {
+  const dict = await getActionDictionary();
   const parsed = dateStringSchema.safeParse(weekSunday);
   if (!parsed.success) {
-    return { error: "Invalid week." };
+    return { error: dict.errors.invalidWeek };
   }
   await setHomeWeekCookie(parsed.data);
   revalidatePath("/");
@@ -46,9 +52,10 @@ export async function setHomeWeekAction(weekSunday: string): Promise<HomeActionR
 }
 
 export async function setHomeDayAction(day: string): Promise<HomeActionResult> {
+  const dict = await getActionDictionary();
   const parsed = dateStringSchema.safeParse(day);
   if (!parsed.success) {
-    return { error: "Invalid day." };
+    return { error: dict.errors.invalidDay };
   }
   await setHomeDayCookie(parsed.data);
   revalidatePath("/");
@@ -72,9 +79,10 @@ export async function openOrCreatePlanAction(
   referenceDate: string,
 ): Promise<HomeActionResult> {
   const session = await requireSession();
+  const dict = await getActionDictionary();
   const parsed = openPeriodSchema.safeParse({ type, date: referenceDate });
   if (!parsed.success) {
-    return { error: "Invalid plan parameters." };
+    return { error: dict.errors.invalidPlanParameters };
   }
 
   try {
@@ -91,9 +99,7 @@ export async function openOrCreatePlanAction(
     if (error && typeof error === "object" && "digest" in error) {
       throw error;
     }
-    return {
-      error: error instanceof Error ? error.message : "Unable to open plan.",
-    };
+    return { error: await actionError("unableToOpenPlan", error) };
   }
 }
 
@@ -102,9 +108,10 @@ export async function openOrCreateReportAction(
   referenceDate: string,
 ): Promise<HomeActionResult> {
   const session = await requireSession();
+  const dict = await getActionDictionary();
   const parsed = openPeriodSchema.safeParse({ type, date: referenceDate });
   if (!parsed.success) {
-    return { error: "Invalid report parameters." };
+    return { error: dict.errors.invalidReportParameters };
   }
 
   try {
@@ -121,8 +128,6 @@ export async function openOrCreateReportAction(
     if (error && typeof error === "object" && "digest" in error) {
       throw error;
     }
-    return {
-      error: error instanceof Error ? error.message : "Unable to open report.",
-    };
+    return { error: await actionError("unableToOpenReport", error) };
   }
 }

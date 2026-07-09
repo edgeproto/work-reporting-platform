@@ -33,9 +33,11 @@ type PageProps = {
 function ChangeTimestamps({
   submittedAt,
   updatedAt,
+  dict,
 }: {
   submittedAt: Date | null;
   updatedAt: Date;
+  dict: Awaited<ReturnType<typeof getDictionary>>;
 }) {
   const changedAfterSubmit =
     submittedAt &&
@@ -44,10 +46,18 @@ function ChangeTimestamps({
   return (
     <div className="mt-3 space-y-0.5 border-t pt-3 text-xs text-muted-foreground">
       {submittedAt ? (
-        <p>Submitted {formatDashboardTimestamp(submittedAt)}</p>
+        <p>
+          {formatMessage(dict.dashboard.submittedAt, {
+            timestamp: formatDashboardTimestamp(submittedAt),
+          })}
+        </p>
       ) : null}
       {changedAfterSubmit ? (
-        <p>Last changed {formatDashboardTimestamp(updatedAt)}</p>
+        <p>
+          {formatMessage(dict.dashboard.lastChangedAt, {
+            timestamp: formatDashboardTimestamp(updatedAt),
+          })}
+        </p>
       ) : null}
     </div>
   );
@@ -93,7 +103,7 @@ export default async function MemberDashboardPage({
           href={`/dashboard${backQs ? `?${backQs}` : ""}`}
           className="inline-flex h-7 items-center rounded-lg px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          ← Back to Dashboard
+          {dict.dashboard.backToDashboard}
         </Link>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">
           {detail.member.name}
@@ -106,8 +116,8 @@ export default async function MemberDashboardPage({
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Plan complete</CardTitle>
-            <CardDescription>Submitted plan items for this period</CardDescription>
+            <CardTitle>{dict.dashboard.planComplete}</CardTitle>
+            <CardDescription>{dict.dashboard.planCompleteDescription}</CardDescription>
           </CardHeader>
           <CardContent className="text-3xl font-semibold">
             {detail.completionPct == null
@@ -117,8 +127,8 @@ export default async function MemberDashboardPage({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Working hours</CardTitle>
-            <CardDescription>Visible report hours for this period</CardDescription>
+            <CardTitle>{dict.dashboard.workingHours}</CardTitle>
+            <CardDescription>{dict.dashboard.workingHoursDescription}</CardDescription>
           </CardHeader>
           <CardContent className="text-3xl font-semibold">
             {detail.totalHours.toFixed(1)}
@@ -127,11 +137,9 @@ export default async function MemberDashboardPage({
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Plan</h2>
+        <h2 className="text-lg font-medium">{dict.common.plan}</h2>
         {!detail.plan ? (
-          <p className="text-sm text-muted-foreground">
-            No submitted plan for this period.
-          </p>
+          <p className="text-sm text-muted-foreground">{dict.dashboard.noPlan}</p>
         ) : (
           <Card>
             <CardHeader>
@@ -153,7 +161,7 @@ export default async function MemberDashboardPage({
             </CardHeader>
             <CardContent>
               {detail.plan.items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No visible items.</p>
+                <p className="text-sm text-muted-foreground">{dict.dashboard.noVisibleItems}</p>
               ) : (
                 <ul className="divide-y rounded-lg border">
                   {detail.plan.items.map((item) => (
@@ -167,7 +175,7 @@ export default async function MemberDashboardPage({
                         {item.outcome !== PlanItemOutcome.OPEN ? (
                           <PlanItemOutcomeBadge outcome={item.outcome} />
                         ) : (
-                          <span className="text-xs text-muted-foreground">Open</span>
+                          <span className="text-xs text-muted-foreground">{dict.badges.open}</span>
                         )}
                       </div>
                     </li>
@@ -178,6 +186,7 @@ export default async function MemberDashboardPage({
                 <ChangeTimestamps
                   submittedAt={detail.plan.submittedAt}
                   updatedAt={detail.plan.updatedAt}
+                  dict={dict}
                 />
               ) : null}
             </CardContent>
@@ -186,11 +195,9 @@ export default async function MemberDashboardPage({
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Report</h2>
+        <h2 className="text-lg font-medium">{dict.common.report}</h2>
         {!detail.report ? (
-          <p className="text-sm text-muted-foreground">
-            No submitted report for this period.
-          </p>
+          <p className="text-sm text-muted-foreground">{dict.dashboard.noReport}</p>
         ) : (
           <Card>
             <CardHeader>
@@ -212,7 +219,7 @@ export default async function MemberDashboardPage({
             </CardHeader>
             <CardContent>
               {detail.report.entries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No visible entries.</p>
+                <p className="text-sm text-muted-foreground">{dict.dashboard.noVisibleEntries}</p>
               ) : (
                 <ul className="divide-y rounded-lg border">
                   {detail.report.entries.map((entry) => (
@@ -231,7 +238,9 @@ export default async function MemberDashboardPage({
                       <div className="flex items-center gap-2">
                         <VisibilityBadge visibility={entry.visibility} />
                         <span className="text-muted-foreground">
-                          {entry.hours.toFixed(1)} h
+                          {formatMessage(dict.feed.hoursShort, {
+                            hours: entry.hours.toFixed(1),
+                          })}
                         </span>
                       </div>
                     </li>
@@ -242,6 +251,7 @@ export default async function MemberDashboardPage({
                 <ChangeTimestamps
                   submittedAt={detail.report.submittedAt}
                   updatedAt={detail.report.updatedAt}
+                  dict={dict}
                 />
               ) : null}
             </CardContent>

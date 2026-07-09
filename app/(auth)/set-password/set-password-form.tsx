@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 
 import { setPasswordAction } from "@/app/(auth)/set-password/actions";
+import { useDictionary } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatMessage } from "@/lib/i18n/format";
 
 type SetPasswordFormProps = {
   token: string;
@@ -25,14 +27,19 @@ export function SetPasswordForm({
   userName,
   userEmail,
 }: SetPasswordFormProps) {
+  const dict = useDictionary();
+  const labels = dict.auth.setPassword;
   const [state, formAction, pending] = useActionState(setPasswordAction, {});
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Set your password</CardTitle>
+        <CardTitle>{labels.title}</CardTitle>
         <CardDescription>
-          Welcome, {userName}. Create a password for {userEmail}.
+          {formatMessage(labels.welcome, {
+            name: userName,
+            email: userEmail,
+          })}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -46,7 +53,7 @@ export function SetPasswordForm({
           ) : null}
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{dict.auth.password}</Label>
             <Input
               id="password"
               name="password"
@@ -63,7 +70,7 @@ export function SetPasswordForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm password</Label>
+            <Label htmlFor="confirmPassword">{labels.confirmPassword}</Label>
             <Input
               id="confirmPassword"
               name="confirmPassword"
@@ -80,7 +87,7 @@ export function SetPasswordForm({
           </div>
 
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Saving…" : "Set password"}
+            {pending ? dict.common.saving : labels.button}
           </Button>
         </form>
       </CardContent>

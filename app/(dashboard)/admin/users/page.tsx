@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { UsersManagement } from "@/components/admin/users-management";
 import { auth } from "@/lib/auth";
 import { listOrganizationUsers } from "@/lib/admin/users";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { getLocale } from "@/lib/i18n/get-locale";
 import { canManageUsers } from "@/lib/rbac";
 
 type PageProps = {
@@ -17,6 +19,8 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
   }
 
   const { createdLink } = await searchParams;
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
   const users = await listOrganizationUsers(session!.user.organizationId);
 
   const serializedUsers = users.map((user) => ({
@@ -35,11 +39,9 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          User Management
+          {dict.admin.usersTitle}
         </h1>
-        <p className="text-muted-foreground">
-          Create users, assign roles, and share password-set links manually.
-        </p>
+        <p className="text-muted-foreground">{dict.admin.usersDescription}</p>
       </div>
 
       <UsersManagement

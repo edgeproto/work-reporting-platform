@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 
 import { updateOrganizationNameAction } from "@/app/(dashboard)/admin/settings/actions";
+import { useDictionary } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +26,7 @@ export function OrganizationSettingsForm({
   organizationSlug,
   appUrl,
 }: OrganizationSettingsFormProps) {
+  const dict = useDictionary();
   const [state, formAction, pending] = useActionState(
     updateOrganizationNameAction,
     {},
@@ -34,15 +36,13 @@ export function OrganizationSettingsForm({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Organization</CardTitle>
-          <CardDescription>
-            Display name shown across the platform.
-          </CardDescription>
+          <CardTitle>{dict.admin.organizationTitle}</CardTitle>
+          <CardDescription>{dict.admin.organizationDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="org-name">Name</Label>
+              <Label htmlFor="org-name">{dict.common.name}</Label>
               <Input
                 id="org-name"
                 name="name"
@@ -51,26 +51,24 @@ export function OrganizationSettingsForm({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="org-slug">Slug</Label>
+              <Label htmlFor="org-slug">{dict.admin.slug}</Label>
               <Input
                 id="org-slug"
                 value={organizationSlug}
                 readOnly
                 className="text-muted-foreground"
               />
-              <p className="text-xs text-muted-foreground">
-                Slug is fixed in v1 single-org mode.
-              </p>
+              <p className="text-xs text-muted-foreground">{dict.admin.slugFixed}</p>
             </div>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : "Save changes"}
+              {pending ? dict.common.saving : dict.admin.saveChanges}
             </Button>
             {state.error ? (
               <p className="text-sm text-destructive">{state.error}</p>
             ) : null}
             {state.success ? (
               <p className="text-sm text-green-700 dark:text-green-300">
-                Settings saved.
+                {dict.admin.settingsSaved}
               </p>
             ) : null}
           </form>
@@ -79,19 +77,12 @@ export function OrganizationSettingsForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Application URL</CardTitle>
-          <CardDescription>
-            Base URL used when generating password-set links for new users.
-          </CardDescription>
+          <CardTitle>{dict.admin.appUrlTitle}</CardTitle>
+          <CardDescription>{dict.admin.appUrlDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           <Input readOnly value={appUrl} className="font-mono text-sm" />
-          <p className="text-sm text-muted-foreground">
-            Set <code className="text-xs">APP_URL</code> in your{" "}
-            <code className="text-xs">.env</code> file (e.g.{" "}
-            <code className="text-xs">http://192.168.1.50:3000</code> for LAN
-            access) and restart the app.
-          </p>
+          <p className="text-sm text-muted-foreground">{dict.admin.appUrlHint}</p>
         </CardContent>
       </Card>
     </div>

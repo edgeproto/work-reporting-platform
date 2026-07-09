@@ -32,6 +32,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useDictionary, useI18n } from "@/components/i18n-provider";
 import { formatMessage } from "@/lib/i18n/format";
+import { formatFileSize } from "@/lib/i18n/format-file-size";
 import { periodTypeLabel } from "@/lib/i18n/period-labels";
 import { formatPeriodLabel } from "@/lib/periods";
 
@@ -65,16 +66,6 @@ export type SerializedPlan = {
 type PlanEditorProps = {
   plan: SerializedPlan;
 };
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export function PlanEditor({ plan }: PlanEditorProps) {
   const router = useRouter();
@@ -113,23 +104,19 @@ export function PlanEditor({ plan }: PlanEditorProps) {
 
       {!plan.periodEditable ? (
         <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-          This period is outside the edit window — items can no longer be
-          changed.
+          {dict.plans.outsideEditWindow}
         </p>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Plan items</CardTitle>
-          <CardDescription>
-            Add titled work items for this period. Title is required;
-            description and a file attachment are optional.
-          </CardDescription>
+          <CardTitle>{dict.plans.itemsTitle}</CardTitle>
+          <CardDescription>{dict.plans.itemsDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {plan.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No plan items yet. Add your first item below.
+              {dict.plans.itemsEmpty}
             </p>
           ) : (
             <ul className="divide-y rounded-lg border">
@@ -174,6 +161,7 @@ function PlanItemAttachments({
   compact?: boolean;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -242,7 +230,7 @@ function PlanItemAttachments({
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         <Paperclip className="size-3.5" />
-        Attachments
+        {dict.plans.attachments}
       </div>
 
       {attachments.length > 0 ? (
@@ -260,7 +248,7 @@ function PlanItemAttachments({
                 <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{attachment.fileName}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {formatFileSize(attachment.sizeBytes)}
+                  {formatFileSize(attachment.sizeBytes, dict)}
                 </span>
               </a>
               {!readOnly ? (
@@ -270,7 +258,9 @@ function PlanItemAttachments({
                   size="icon-sm"
                   onClick={() => handleDelete(attachment.id)}
                   disabled={isPending}
-                  aria-label={`Remove ${attachment.fileName}`}
+                  aria-label={formatMessage(dict.common.removeFile, {
+                    fileName: attachment.fileName,
+                  })}
                 >
                   <X />
                 </Button>
@@ -279,7 +269,7 @@ function PlanItemAttachments({
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-muted-foreground">No attachments.</p>
+        <p className="text-xs text-muted-foreground">{dict.plans.noAttachments}</p>
       )}
 
       {!readOnly ? (
@@ -289,7 +279,7 @@ function PlanItemAttachments({
             className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-normal text-primary hover:underline"
           >
             <Upload className="size-3.5" />
-            {isPending ? "Uploading…" : "Upload file"}
+            {isPending ? dict.plans.uploading : dict.plans.uploadFile}
           </Label>
           <input
             id={`plan-upload-${itemId}`}
@@ -319,6 +309,7 @@ function PlanItemRow({
   canDelete: boolean;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -360,7 +351,7 @@ function PlanItemRow({
       <li className="space-y-3 px-4 py-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor={`edit-title-${item.id}`}>Title</Label>
+            <Label htmlFor={`edit-title-${item.id}`}>{dict.common.title}</Label>
             <Input
               id={`edit-title-${item.id}`}
               value={title}
@@ -369,7 +360,9 @@ function PlanItemRow({
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor={`edit-desc-${item.id}`}>Description</Label>
+            <Label htmlFor={`edit-desc-${item.id}`}>
+              {dict.common.description}
+            </Label>
             <Textarea
               id={`edit-desc-${item.id}`}
               value={description}
@@ -378,7 +371,9 @@ function PlanItemRow({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor={`edit-vis-${item.id}`}>Visibility</Label>
+            <Label htmlFor={`edit-vis-${item.id}`}>
+              {dict.common.visibility}
+            </Label>
             <select
               id={`edit-vis-${item.id}`}
               value={visibility}
@@ -387,8 +382,8 @@ function PlanItemRow({
               }
               className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
             >
-              <option value="PUBLIC">Public</option>
-              <option value="PRIVATE">Private</option>
+              <option value="PUBLIC">{dict.badges.public}</option>
+              <option value="PRIVATE">{dict.badges.private}</option>
             </select>
           </div>
         </div>
@@ -399,7 +394,7 @@ function PlanItemRow({
             onClick={handleSave}
             disabled={isPending || title.trim().length === 0}
           >
-            {isPending ? "Saving…" : "Save"}
+            {isPending ? dict.common.saving : dict.common.save}
           </Button>
           <Button
             type="button"
@@ -414,7 +409,7 @@ function PlanItemRow({
             }}
             disabled={isPending}
           >
-            Cancel
+            {dict.common.cancel}
           </Button>
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -452,7 +447,9 @@ function PlanItemRow({
               size="icon-sm"
               onClick={() => setEditing(true)}
               disabled={isPending}
-              aria-label={`Edit ${item.title}`}
+              aria-label={formatMessage(dict.common.editItem, {
+                title: item.title,
+              })}
             >
               <Pencil />
             </Button>
@@ -464,7 +461,9 @@ function PlanItemRow({
               size="icon-sm"
               onClick={handleDelete}
               disabled={isPending}
-              aria-label={`Delete ${item.title}`}
+              aria-label={formatMessage(dict.common.deleteItem, {
+                title: item.title,
+              })}
             >
               <Trash2 />
             </Button>
@@ -484,6 +483,7 @@ function PlanItemRow({
 
 function AddPlanItemForm({ planId }: { planId: string }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
@@ -538,34 +538,34 @@ function AddPlanItemForm({ planId }: { planId: string }) {
     <>
       <Separator />
       <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm font-medium">Add plan item</p>
+        <p className="text-sm font-medium">{dict.plans.addItemTitle}</p>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="item-title">Title</Label>
+            <Label htmlFor="item-title">{dict.common.title}</Label>
             <Input
               id="item-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="What do you plan to work on?"
+              placeholder={dict.plans.titlePlaceholder}
               required
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="item-description">Description</Label>
+            <Label htmlFor="item-description">{dict.common.description}</Label>
             <Textarea
               id="item-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              placeholder="Additional context…"
+              placeholder={dict.plans.descriptionPlaceholder}
             />
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="item-visibility">Visibility</Label>
+            <Label htmlFor="item-visibility">{dict.common.visibility}</Label>
             <select
               id="item-visibility"
               value={visibility}
@@ -574,12 +574,12 @@ function AddPlanItemForm({ planId }: { planId: string }) {
               }
               className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
             >
-              <option value="PUBLIC">Public — visible to teammates</option>
-              <option value="PRIVATE">Private — managers only</option>
+              <option value="PUBLIC">{dict.plans.visibilityPublicHint}</option>
+              <option value="PRIVATE">{dict.plans.visibilityPrivateHint}</option>
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="item-file">File (optional)</Label>
+            <Label htmlFor="item-file">{dict.plans.fileOptional}</Label>
             <Input
               id="item-file"
               type="file"
@@ -591,7 +591,7 @@ function AddPlanItemForm({ planId }: { planId: string }) {
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button type="submit" disabled={isPending || title.trim().length === 0}>
-          {isPending ? "Adding…" : "Add item"}
+          {isPending ? dict.plans.adding : dict.plans.addItem}
         </Button>
       </form>
     </>
@@ -611,6 +611,7 @@ function PlanActions({
   periodEditable: boolean;
   router: ReturnType<typeof useRouter>;
 }) {
+  const dict = useDictionary();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const canSubmit = itemCount > 0 && periodEditable;
@@ -645,8 +646,7 @@ function PlanActions({
         <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Lock className="size-4" />
-            This plan has been submitted. Use the edit icon on each item to
-            update it within the edit window.
+            {dict.plans.submittedMessage}
           </div>
           {periodEditable ? (
             <Button
@@ -655,7 +655,7 @@ function PlanActions({
               onClick={handleReopen}
               disabled={isPending}
             >
-              {isPending ? "Reopening…" : "Reopen as draft"}
+              {isPending ? dict.plans.reopening : dict.plans.reopenDraft}
             </Button>
           ) : null}
           {error ? <p className="w-full text-sm text-destructive">{error}</p> : null}
@@ -669,7 +669,7 @@ function PlanActions({
       <Card>
         <CardContent className="flex items-center gap-2 pt-6 text-sm text-muted-foreground">
           <Lock className="size-4" />
-          This draft is outside the edit window and cannot be submitted.
+          {dict.plans.draftOutsideWindow}
         </CardContent>
       </Card>
     );
@@ -679,16 +679,14 @@ function PlanActions({
     <Card>
       <CardFooter className="flex flex-wrap items-center justify-between gap-4 border-t-0 bg-transparent">
         <p className="text-sm text-muted-foreground">
-          {canSubmit
-            ? "Submit when ready — teammates will see public items after submission."
-            : "Add at least one plan item before you can submit."}
+          {canSubmit ? dict.plans.submitReady : dict.plans.submitNeedItems}
         </p>
         <Button
           type="button"
           onClick={handleSubmit}
           disabled={isPending || !canSubmit}
         >
-          {isPending ? "Submitting…" : "Submit plan"}
+          {isPending ? dict.plans.submitting : dict.plans.submit}
         </Button>
         {error ? <p className="w-full text-sm text-destructive">{error}</p> : null}
       </CardFooter>

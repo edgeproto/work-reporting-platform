@@ -5,6 +5,11 @@ import { z } from "zod";
 
 import { requireSession } from "@/lib/auth";
 import {
+  actionError,
+  getActionDictionary,
+} from "@/lib/i18n/action-dictionary";
+import { translateFieldErrors } from "@/lib/i18n/translate-error";
+import {
   changeUserPassword,
   removeUserAvatar,
   updateUserAvatar,
@@ -18,34 +23,24 @@ export type SettingsActionResult = {
   fieldErrors?: Record<string, string[]>;
 };
 
-const profileSchema = z.object({
-  name: z.string().trim().min(1, "Name is required.").max(100),
-  email: emailSchema,
-});
-
-const passwordSchema = z
-  .object({
-    currentPassword: z.string().min(1, "Current password is required."),
-    newPassword: z.string().min(8, "Password must be at least 8 characters."),
-    confirmPassword: z.string().min(1, "Confirm your new password."),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
-
 export async function updateProfileAction(
   _prev: SettingsActionResult,
   formData: FormData,
 ): Promise<SettingsActionResult> {
   const session = await requireSession();
+  const dict = await getActionDictionary();
+  const profileSchema = z.object({
+    name: z.string().trim().min(1, dict.errors.nameRequired).max(100),
+    email: emailSchema,
+  });
+
   const parsed = profileSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
   });
 
   if (!parsed.success) {
-    return { fieldErrors: parsed.error.flatten().fieldErrors };
+    return { fieldErrors: translateFieldErrors(parsed.error.flatten().fieldErrors, dict) };
   }
 
   try {
@@ -58,9 +53,7 @@ export async function updateProfileAction(
     revalidatePath("/", "layout");
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to update profile.",
-    };
+    return { error: await actionError("unableToUpdateProfile", error) };
   }
 }
 
@@ -69,6 +62,18 @@ export async function changePasswordAction(
   formData: FormData,
 ): Promise<SettingsActionResult> {
   const session = await requireSession();
+  const dict = await getActionDictionary();
+  const passwordSchema = z
+    .object({
+      currentPassword: z.string().min(1, dict.errors.currentPasswordRequired),
+      newPassword: z.string().min(8, dict.errors.passwordMinLength),
+      confirmPassword: z.string().min(1, dict.errors.confirmPasswordRequired),
+    })
+    .refine((data) => data.newPassword === data.confirmPassword, {
+      message: dict.errors.passwordsDoNotMatch,
+      path: ["confirmPassword"],
+    });
+
   const parsed = passwordSchema.safeParse({
     currentPassword: formData.get("currentPassword"),
     newPassword: formData.get("newPassword"),
@@ -76,7 +81,7 @@ export async function changePasswordAction(
   });
 
   if (!parsed.success) {
-    return { fieldErrors: parsed.error.flatten().fieldErrors };
+    return { fieldErrors: translateFieldErrors(parsed.error.flatten().fieldErrors, dict) };
   }
 
   try {
@@ -89,10 +94,7 @@ export async function changePasswordAction(
     revalidatePath("/settings");
     return { success: true };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Unable to change password.",
-    };
+    return { error: await actionError("unableToChangePassword", error) };
   }
 }
 
@@ -104,7 +106,8 @@ export async function uploadAvatarAction(
   const file = formData.get("avatar");
 
   if (!(file instanceof File)) {
-    return { error: "No file selected." };
+    const dict = await getActionDictionary();
+    return { error: dict.errors.noFileSelected };
   }
 
   try {
@@ -117,9 +120,7 @@ export async function uploadAvatarAction(
     revalidatePath("/", "layout");
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to upload avatar.",
-    };
+    return { error: await actionError("unableToUploadAvatar", error) };
   }
 }
 
@@ -132,8 +133,6 @@ export async function removeAvatarAction(): Promise<SettingsActionResult> {
     revalidatePath("/", "layout");
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to remove avatar.",
-    };
+    return { error: await actionError("unableToRemoveAvatar", error) };
   }
 }

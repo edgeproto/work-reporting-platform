@@ -4,18 +4,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { signOut } from "@/lib/auth";
+import {
+  getActionDictionary,
+} from "@/lib/i18n/action-dictionary";
+import { translateFieldErrors } from "@/lib/i18n/translate-error";
 import { setPasswordWithToken } from "@/lib/password-set-token";
-
-const setPasswordSchema = z
-  .object({
-    token: z.string().min(1),
-    password: z.string().min(8, "Password must be at least 8 characters."),
-    confirmPassword: z.string().min(1),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
 
 export type SetPasswordState = {
   error?: string;
@@ -29,6 +22,18 @@ export async function setPasswordAction(
   _prevState: SetPasswordState,
   formData: FormData,
 ): Promise<SetPasswordState> {
+  const dict = await getActionDictionary();
+  const setPasswordSchema = z
+    .object({
+      token: z.string().min(1),
+      password: z.string().min(8, dict.errors.passwordMinLength),
+      confirmPassword: z.string().min(1),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: dict.errors.passwordsDoNotMatch,
+      path: ["confirmPassword"],
+    });
+
   const parsed = setPasswordSchema.safeParse({
     token: formData.get("token"),
     password: formData.get("password"),
@@ -36,7 +41,10 @@ export async function setPasswordAction(
   });
 
   if (!parsed.success) {
-    const fieldErrors = parsed.error.flatten().fieldErrors;
+    const fieldErrors = translateFieldErrors(
+      parsed.error.flatten().fieldErrors,
+      dict,
+    );
     return {
       fieldErrors: {
         password: fieldErrors.password,
@@ -53,18 +61,16 @@ export async function setPasswordAction(
   if (!result.ok) {
     switch (result.reason) {
       case "expired":
-        return { error: "This link has expired. Ask your admin for a new one." };
+        return { error: dict.errors.linkExpired };
       case "used":
-        return { error: "This link has already been used." };
+        return { error: dict.errors.linkUsed };
       case "inactive":
-        return { error: "This account is inactive." };
+        return { error: dict.errors.linkInactive };
       default:
-        return { error: "Invalid password-set link." };
+        return { error: dict.errors.invalidPasswordSetLink };
     }
   }
 
-  // Clear any existing session (e.g. admin testing the link) so the new user
-  // lands on the login page with the success message.
   await signOut({ redirect: false });
 
   redirect("/login?passwordSet=1");

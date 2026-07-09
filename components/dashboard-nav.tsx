@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { useDictionary } from "@/components/i18n-provider";
 import { cn } from "@/lib/utils";
 
 export type DashboardNavLink = {
@@ -44,6 +45,7 @@ export function DashboardNav({
   orientation?: "horizontal" | "vertical";
   collapsed?: boolean;
 }) {
+  const dict = useDictionary();
   const pathname = usePathname();
   const vertical = orientation === "vertical";
 
@@ -54,7 +56,7 @@ export function DashboardNav({
           ? "flex flex-col gap-1"
           : "hidden items-center gap-1 sm:flex",
       )}
-      aria-label="Main"
+      aria-label={dict.shell.mainNav}
     >
       {links.map((link) => {
         const active = isNavLinkActive(pathname, link.href);

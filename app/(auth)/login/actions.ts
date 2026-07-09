@@ -4,6 +4,7 @@ import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 
 import { signIn } from "@/lib/auth";
+import { getActionDictionary } from "@/lib/i18n/action-dictionary";
 
 export type LoginState = {
   error?: string;
@@ -16,6 +17,7 @@ export async function loginAction(
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
   const callbackUrl = String(formData.get("callbackUrl") ?? "/");
+  const dict = await getActionDictionary();
 
   try {
     await signIn("credentials", {
@@ -27,9 +29,9 @@ export async function loginAction(
     if (error instanceof AuthError) {
       switch (error.type) {
         case "CredentialsSignin":
-          return { error: "Invalid email or password." };
+          return { error: dict.errors.invalidEmailOrPassword };
         default:
-          return { error: "Unable to sign in. Please try again." };
+          return { error: dict.errors.unableToSignIn };
       }
     }
 

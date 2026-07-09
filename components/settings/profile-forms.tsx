@@ -11,6 +11,7 @@ import {
   type SettingsActionResult,
 } from "@/app/(dashboard)/settings/actions";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { useDictionary } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -62,13 +63,13 @@ function LanguageCard({
   locale: Locale;
   languageLabel: string;
 }) {
+  const dict = useDictionary();
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Language</CardTitle>
-        <CardDescription>
-          Choose the language used across the app interface.
-        </CardDescription>
+        <CardTitle>{dict.settings.languageTitle}</CardTitle>
+        <CardDescription>{dict.settings.languageDescription}</CardDescription>
       </CardHeader>
       <CardContent>
         <LanguageSwitcher
@@ -88,6 +89,7 @@ function AvatarCard({
   userId: string;
   hasAvatar: boolean;
 }) {
+  const dict = useDictionary();
   const router = useRouter();
   const [state, formAction, pending] = useActionState<
     SettingsActionResult,
@@ -110,17 +112,15 @@ function AvatarCard({
     const file = fileRef.current?.files?.[0];
     if (file && file.size > maxAvatarBytes) {
       event.preventDefault();
-      setClientError("Avatar must be 2 MB or smaller.");
+      setClientError(dict.settings.avatarTooLarge);
     }
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Avatar</CardTitle>
-        <CardDescription>
-          Upload a square image (JPEG, PNG, GIF, or WebP). Max 2 MB.
-        </CardDescription>
+        <CardTitle>{dict.settings.avatarTitle}</CardTitle>
+        <CardDescription>{dict.settings.avatarDescription}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-4">
         <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border bg-muted text-lg font-medium">
@@ -128,7 +128,7 @@ function AvatarCard({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={`/api/avatars/${userId}?v=${Date.now()}`}
-              alt="Your avatar"
+              alt={dict.settings.avatarAlt}
               className="size-full object-cover"
             />
           ) : (
@@ -150,7 +150,7 @@ function AvatarCard({
             onChange={() => setClientError(null)}
           />
           <Button type="submit" disabled={pending}>
-            {pending ? "Uploading…" : "Upload"}
+            {pending ? dict.settings.uploading : dict.settings.upload}
           </Button>
         </form>
         {hasAvatar ? (
@@ -170,7 +170,7 @@ function AvatarCard({
               });
             }}
           >
-            {isRemoving ? "Removing…" : "Remove"}
+            {isRemoving ? dict.settings.removing : dict.settings.remove}
           </Button>
         ) : null}
         {clientError ? (
@@ -180,7 +180,7 @@ function AvatarCard({
           <p className="w-full text-sm text-destructive">{state.error}</p>
         ) : null}
         {state.success ? (
-          <p className="w-full text-sm text-muted-foreground">Avatar updated.</p>
+          <p className="w-full text-sm text-muted-foreground">{dict.settings.avatarUpdated}</p>
         ) : null}
         {removeError ? (
           <p className="w-full text-sm text-destructive">{removeError}</p>
@@ -199,6 +199,7 @@ function ProfileCard({
   email: string;
   roleLabel: string;
 }) {
+  const dict = useDictionary();
   const router = useRouter();
   const [nameValue, setNameValue] = useState(name);
   const [emailValue, setEmailValue] = useState(email);
@@ -221,15 +222,13 @@ function ProfileCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profile</CardTitle>
-        <CardDescription>
-          Update your display name and email. Role is managed by an admin.
-        </CardDescription>
+        <CardTitle>{dict.settings.profileTitle}</CardTitle>
+        <CardDescription>{dict.settings.profileDescription}</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="max-w-md space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="settings-name">Name</Label>
+            <Label htmlFor="settings-name">{dict.common.name}</Label>
             <Input
               id="settings-name"
               name="name"
@@ -245,7 +244,7 @@ function ProfileCard({
             ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="settings-email">Email</Label>
+            <Label htmlFor="settings-email">{dict.common.email}</Label>
             <Input
               id="settings-email"
               name="email"
@@ -261,20 +260,17 @@ function ProfileCard({
             ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="settings-role">Role</Label>
+            <Label htmlFor="settings-role">{dict.common.role}</Label>
             <Input id="settings-role" value={roleLabel} disabled readOnly />
           </div>
           {state.error ? (
             <p className="text-sm text-destructive">{state.error}</p>
           ) : null}
           {state.success ? (
-            <p className="text-sm text-muted-foreground">
-              Profile saved. Sign out and back in if your name in the sidebar
-              looks stale.
-            </p>
+            <p className="text-sm text-muted-foreground">{dict.settings.profileSaved}</p>
           ) : null}
           <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Save profile"}
+            {pending ? dict.common.saving : dict.settings.saveProfile}
           </Button>
         </form>
       </CardContent>
@@ -283,6 +279,7 @@ function ProfileCard({
 }
 
 function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
+  const dict = useDictionary();
   const [state, formAction, pending] = useActionState<
     SettingsActionResult,
     FormData
@@ -299,10 +296,8 @@ function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Password</CardTitle>
-          <CardDescription>
-            No password is set yet. Ask an admin for a password-set link.
-          </CardDescription>
+          <CardTitle>{dict.settings.passwordTitle}</CardTitle>
+          <CardDescription>{dict.settings.passwordNoPassword}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -311,10 +306,8 @@ function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Password</CardTitle>
-        <CardDescription>
-          Choose a new password (at least 8 characters).
-        </CardDescription>
+        <CardTitle>{dict.settings.passwordTitle}</CardTitle>
+        <CardDescription>{dict.settings.passwordDescription}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -323,7 +316,7 @@ function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
           className="max-w-md space-y-4"
         >
           <div className="space-y-1.5">
-            <Label htmlFor="current-password">Current password</Label>
+            <Label htmlFor="current-password">{dict.settings.passwordCurrent}</Label>
             <Input
               id="current-password"
               name="currentPassword"
@@ -338,7 +331,7 @@ function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
             ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="new-password">New password</Label>
+            <Label htmlFor="new-password">{dict.settings.passwordNew}</Label>
             <Input
               id="new-password"
               name="newPassword"
@@ -354,7 +347,7 @@ function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
             ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="confirm-password">Confirm new password</Label>
+            <Label htmlFor="confirm-password">{dict.settings.passwordConfirm}</Label>
             <Input
               id="confirm-password"
               name="confirmPassword"
@@ -373,10 +366,10 @@ function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
             <p className="text-sm text-destructive">{state.error}</p>
           ) : null}
           {state.success ? (
-            <p className="text-sm text-muted-foreground">Password updated.</p>
+            <p className="text-sm text-muted-foreground">{dict.settings.passwordUpdated}</p>
           ) : null}
           <Button type="submit" disabled={pending}>
-            {pending ? "Updating…" : "Change password"}
+            {pending ? dict.settings.updating : dict.settings.changePassword}
           </Button>
         </form>
       </CardContent>

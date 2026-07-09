@@ -11,6 +11,11 @@ import {
   updateOrganizationUserRole,
 } from "@/lib/admin/users";
 import { requireSession } from "@/lib/auth";
+import {
+  actionError,
+  firstValidationError,
+  getActionDictionary,
+} from "@/lib/i18n/action-dictionary";
 import { canManageUsers } from "@/lib/rbac";
 import { emailSchema } from "@/lib/validation";
 
@@ -21,12 +26,6 @@ export type AdminActionResult = {
 };
 
 const roleSchema = z.enum(["ADMIN", "MANAGER", "MEMBER"]);
-
-const createUserSchema = z.object({
-  name: z.string().trim().min(1, "Name is required.").max(100),
-  email: emailSchema,
-  role: roleSchema,
-});
 
 async function requireAdminSession() {
   const session = await requireSession();
@@ -41,6 +40,12 @@ export async function createUserAction(
   formData: FormData,
 ): Promise<AdminActionResult> {
   const session = await requireAdminSession();
+  const dict = await getActionDictionary();
+  const createUserSchema = z.object({
+    name: z.string().trim().min(1, dict.errors.nameRequired).max(100),
+    email: emailSchema,
+    role: roleSchema,
+  });
 
   const parsed = createUserSchema.safeParse({
     name: formData.get("name"),
@@ -49,9 +54,7 @@ export async function createUserAction(
   });
 
   if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "Invalid input.",
-    };
+    return { error: await firstValidationError(parsed.error) };
   }
 
   try {
@@ -67,9 +70,7 @@ export async function createUserAction(
       passwordSetLink: result.passwordSetLink,
     };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to create user.",
-    };
+    return { error: await actionError("unableToCreateUser", error) };
   }
 }
 
@@ -78,10 +79,11 @@ export async function updateUserRoleAction(
   role: Role,
 ): Promise<AdminActionResult> {
   const session = await requireAdminSession();
+  const dict = await getActionDictionary();
 
   const parsed = roleSchema.safeParse(role);
   if (!parsed.success) {
-    return { error: "Invalid role." };
+    return { error: dict.errors.invalidRole };
   }
 
   try {
@@ -94,9 +96,7 @@ export async function updateUserRoleAction(
     revalidatePath("/admin/users");
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to update role.",
-    };
+    return { error: await actionError("unableToUpdateRole", error) };
   }
 }
 
@@ -116,10 +116,7 @@ export async function setUserActiveAction(
     revalidatePath("/admin/users");
     return { success: true };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Unable to update user status.",
-    };
+    return { error: await actionError("unableToUpdateUserStatus", error) };
   }
 }
 
@@ -139,11 +136,6 @@ export async function regeneratePasswordLinkAction(
       passwordSetLink: result.passwordSetLink,
     };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Unable to generate password-set link.",
-    };
+    return { error: await actionError("unableToGeneratePasswordLink", error) };
   }
 }

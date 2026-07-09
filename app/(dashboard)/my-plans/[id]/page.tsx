@@ -6,6 +6,8 @@ import {
   type SerializedPlan,
 } from "@/components/plans/plan-editor";
 import { requireSession } from "@/lib/auth";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { getLocale } from "@/lib/i18n/get-locale";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { getPlanById } from "@/lib/plans/queries";
 import { canEditPeriod } from "@/lib/periods";
@@ -55,13 +57,16 @@ export default async function PlanEditorPage({ params }: PageProps) {
     notFound();
   }
 
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+
   return (
     <div className="space-y-4">
       <Link
         href="/"
         className="inline-flex h-7 items-center rounded-lg px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
-        ← Back to Home
+        {dict.navEditor.backToHome}
       </Link>
       <PlanEditor plan={serializePlan(plan)} />
     </div>

@@ -10,6 +10,8 @@ import {
 } from "@/components/reports/report-editor";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { requireSession } from "@/lib/auth";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { getLocale } from "@/lib/i18n/get-locale";
 import { getReportEntryTitle } from "@/lib/reports/entry-title";
 import { getReportById, getSubmittedPlanForReport } from "@/lib/reports/queries";
 import { removeMechanicallyCopiedDailyEntries } from "@/lib/reports/create-draft";
@@ -138,13 +140,16 @@ export default async function ReportEditorPage({ params }: PageProps) {
     ? serializeMatchingPlan(submittedPlan)
     : null;
 
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+
   return (
     <div className="space-y-4">
       <Link
         href="/"
         className="inline-flex h-7 items-center rounded-lg px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
-        ← Back to Home
+        {dict.navEditor.backToHome}
       </Link>
       <ReportEditor report={serializeReport(editorReport, matchingPlan)} />
     </div>

@@ -4,10 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
-import {
-  DashboardNav,
-  type DashboardNavLink,
-} from "@/components/dashboard-nav";
+import { DashboardNav, type DashboardNavLink } from "@/components/dashboard-nav";
+import { useDictionary } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +47,7 @@ export function DashboardShell({
   signOutAction,
   children,
 }: DashboardShellProps) {
+  const dict = useDictionary();
   const [collapsed, setCollapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -94,9 +93,13 @@ export function DashboardShell({
             variant="ghost"
             size="icon-sm"
             onClick={toggle}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={
+              collapsed ? dict.shell.expandSidebar : dict.shell.collapseSidebar
+            }
             aria-expanded={!collapsed}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={
+              collapsed ? dict.shell.expandSidebar : dict.shell.collapseSidebar
+            }
           >
             {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
           </Button>

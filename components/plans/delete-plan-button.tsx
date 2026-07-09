@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 
 import { deletePlanAction } from "@/app/(dashboard)/my-plans/actions";
+import { useDictionary } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 
 type DeletePlanButtonProps = {
@@ -16,20 +17,18 @@ type DeletePlanButtonProps = {
 
 export function DeletePlanButton({
   planId,
-  label = "Delete",
+  label,
   size = "sm",
   variant = "outline",
 }: DeletePlanButtonProps) {
+  const dict = useDictionary();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const buttonLabel = label ?? dict.common.delete;
 
   const handleDelete = () => {
-    if (
-      !window.confirm(
-        "Delete this plan? All planned tasks on it will be removed. This cannot be undone.",
-      )
-    ) {
+    if (!window.confirm(dict.plans.deleteConfirm)) {
       return;
     }
 
@@ -54,7 +53,7 @@ export function DeletePlanButton({
           size="icon-sm"
           onClick={handleDelete}
           disabled={isPending}
-          aria-label="Delete plan"
+          aria-label={dict.plans.deleteAria}
         >
           <Trash2 />
         </Button>
@@ -72,7 +71,7 @@ export function DeletePlanButton({
         onClick={handleDelete}
         disabled={isPending}
       >
-        {isPending ? "Deleting…" : label}
+        {isPending ? dict.common.deleting : buttonLabel}
       </Button>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>

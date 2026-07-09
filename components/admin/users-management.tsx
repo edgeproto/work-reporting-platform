@@ -12,6 +12,7 @@ import {
   updateUserRoleAction,
   type AdminActionResult,
 } from "@/app/(dashboard)/admin/users/actions";
+import { useDictionary } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatMessage } from "@/lib/i18n/format";
 
 export type SerializedAdminUser = {
   id: string;
@@ -42,16 +44,13 @@ type UsersManagementProps = {
   createdLink?: string;
 };
 
-function roleLabel(role: Role): string {
-  return role.charAt(0) + role.slice(1).toLowerCase();
-}
-
 function formatExpiry(iso: string | null): string | null {
   if (!iso) return null;
   return `${new Date(iso).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 function CopyLinkButton({ link }: { link: string }) {
+  const dict = useDictionary();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -60,7 +59,6 @@ function CopyLinkButton({ link }: { link: string }) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback for older browsers
       const input = document.createElement("textarea");
       input.value = link;
       document.body.appendChild(input);
@@ -81,20 +79,22 @@ function CopyLinkButton({ link }: { link: string }) {
       data-testid="copy-password-link"
     >
       {copied ? <Check /> : <Copy />}
-      {copied ? "Copied" : "Copy link"}
+      {copied ? dict.admin.copied : dict.admin.copyLink}
     </Button>
   );
 }
 
 function CreatedLinkBanner({ link }: { link: string }) {
+  const dict = useDictionary();
+
   return (
     <div
       className="space-y-2 rounded-lg border bg-muted/30 p-4"
       data-testid="created-user-link"
     >
-      <p className="text-sm font-medium">Password-set link created</p>
+      <p className="text-sm font-medium">{dict.admin.linkCreatedTitle}</p>
       <p className="text-sm text-muted-foreground">
-        Share this link with the new user (Slack, Teams, in person, etc.).
+        {dict.admin.linkCreatedDescription}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Input
@@ -110,6 +110,7 @@ function CreatedLinkBanner({ link }: { link: string }) {
 }
 
 function CreateUserForm() {
+  const dict = useDictionary();
   const router = useRouter();
   const [state, formAction, pending] = useActionState<
     AdminActionResult,
@@ -127,15 +128,13 @@ function CreateUserForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create user</CardTitle>
-        <CardDescription>
-          New users receive a one-time password-set link to share manually.
-        </CardDescription>
+        <CardTitle>{dict.admin.createUserTitle}</CardTitle>
+        <CardDescription>{dict.admin.createUserDescription}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form action={formAction} className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="create-name">Name</Label>
+            <Label htmlFor="create-name">{dict.common.name}</Label>
             <Input
               id="create-name"
               name="name"
@@ -144,7 +143,7 @@ function CreateUserForm() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="create-email">Email</Label>
+            <Label htmlFor="create-email">{dict.common.email}</Label>
             <Input
               id="create-email"
               name="email"
@@ -154,7 +153,7 @@ function CreateUserForm() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="create-role">Role</Label>
+            <Label htmlFor="create-role">{dict.common.role}</Label>
             <select
               id="create-role"
               name="role"
@@ -164,7 +163,7 @@ function CreateUserForm() {
             >
               {Object.values(Role).map((role) => (
                 <option key={role} value={role}>
-                  {roleLabel(role)}
+                  {dict.roles[role]}
                 </option>
               ))}
             </select>
@@ -175,7 +174,7 @@ function CreateUserForm() {
               disabled={pending}
               data-testid="create-user-submit"
             >
-              {pending ? "Creating…" : "Create user"}
+              {pending ? dict.admin.creating : dict.admin.createUser}
             </Button>
           </div>
         </form>
@@ -197,6 +196,7 @@ function UserRow({
   user: SerializedAdminUser;
   currentUserId: string;
 }) {
+  const dict = useDictionary();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -254,16 +254,16 @@ function UserRow({
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{user.name}</span>
-            <Badge variant="outline">{roleLabel(user.role)}</Badge>
+            <Badge variant="outline">{dict.roles[user.role]}</Badge>
             {!user.isActive ? (
-              <Badge variant="secondary">Inactive</Badge>
+              <Badge variant="secondary">{dict.admin.inactive}</Badge>
             ) : null}
             {user.hasPassword ? (
-              <Badge variant="secondary">Password set</Badge>
+              <Badge variant="secondary">{dict.admin.passwordSet}</Badge>
             ) : (
-              <Badge variant="outline">Awaiting password</Badge>
+              <Badge variant="outline">{dict.admin.awaitingPassword}</Badge>
             )}
-            {isSelf ? <Badge>You</Badge> : null}
+            {isSelf ? <Badge>{dict.admin.you}</Badge> : null}
           </div>
           <p className="text-sm text-muted-foreground">{user.email}</p>
         </div>
@@ -275,12 +275,12 @@ function UserRow({
                 value={user.role}
                 onChange={(e) => handleRoleChange(e.target.value as Role)}
                 disabled={isPending || !user.isActive}
-                aria-label={`Role for ${user.name}`}
+                aria-label={formatMessage(dict.admin.roleFor, { name: user.name })}
                 className="flex h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30"
               >
                 {Object.values(Role).map((role) => (
                   <option key={role} value={role}>
-                    {roleLabel(role)}
+                    {dict.roles[role]}
                   </option>
                 ))}
               </select>
@@ -291,7 +291,7 @@ function UserRow({
                 onClick={handleToggleActive}
                 disabled={isPending}
               >
-                {user.isActive ? "Deactivate" : "Activate"}
+                {user.isActive ? dict.admin.deactivate : dict.admin.activate}
               </Button>
             </>
           ) : null}
@@ -318,7 +318,7 @@ function UserRow({
                 data-testid={`regenerate-link-${user.email}`}
               >
                 <RefreshCw />
-                Regenerate
+                {dict.admin.regenerate}
               </Button>
             </div>
           ) : (
@@ -331,12 +331,12 @@ function UserRow({
               data-testid={`generate-link-${user.email}`}
             >
               <RefreshCw />
-              Generate password-set link
+              {dict.admin.generateLink}
             </Button>
           )}
           {expiry ? (
             <p className="text-xs text-muted-foreground">
-              Link expires {expiry}
+              {formatMessage(dict.admin.linkExpires, { expiry })}
             </p>
           ) : null}
         </div>
@@ -352,6 +352,8 @@ export function UsersManagement({
   currentUserId,
   createdLink,
 }: UsersManagementProps) {
+  const dict = useDictionary();
+
   return (
     <div className="space-y-8">
       {createdLink ? <CreatedLinkBanner link={createdLink} /> : null}
@@ -359,16 +361,17 @@ export function UsersManagement({
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-medium">Team members</h2>
+          <h2 className="text-lg font-medium">{dict.admin.teamMembers}</h2>
           <p className="text-sm text-muted-foreground">
-            {users.length} user{users.length === 1 ? "" : "s"} in your
-            organization
+            {users.length === 1
+              ? formatMessage(dict.admin.userCountOne, { count: users.length })
+              : formatMessage(dict.admin.userCountMany, { count: users.length })}
           </p>
         </div>
 
         {users.length === 0 ? (
           <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-            No users yet. Create the first account above.
+            {dict.admin.noUsers}
           </p>
         ) : (
           <ul className="divide-y rounded-lg border" data-testid="users-list">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 
 import { deleteReportAction } from "@/app/(dashboard)/my-reports/actions";
+import { useDictionary } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 
 type DeleteReportButtonProps = {
@@ -16,20 +17,18 @@ type DeleteReportButtonProps = {
 
 export function DeleteReportButton({
   reportId,
-  label = "Delete",
+  label,
   size = "sm",
   variant = "outline",
 }: DeleteReportButtonProps) {
+  const dict = useDictionary();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const buttonLabel = label ?? dict.common.delete;
 
   const handleDelete = () => {
-    if (
-      !window.confirm(
-        "Delete this report? All entries will be removed. Plan items completed by this report will be reopened. This cannot be undone.",
-      )
-    ) {
+    if (!window.confirm(dict.reports.deleteConfirm)) {
       return;
     }
 
@@ -54,7 +53,7 @@ export function DeleteReportButton({
           size="icon-sm"
           onClick={handleDelete}
           disabled={isPending}
-          aria-label="Delete report"
+          aria-label={dict.reports.deleteAria}
         >
           <Trash2 />
         </Button>
@@ -72,7 +71,7 @@ export function DeleteReportButton({
         onClick={handleDelete}
         disabled={isPending}
       >
-        {isPending ? "Deleting…" : label}
+        {isPending ? dict.common.deleting : buttonLabel}
       </Button>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>

@@ -6,6 +6,11 @@ import { z } from "zod";
 
 import { PeriodType, PlanItemOutcome } from "@/app/generated/prisma/enums";
 import { requireSession } from "@/lib/auth";
+import {
+  actionError,
+  firstValidationError,
+  getActionDictionary,
+} from "@/lib/i18n/action-dictionary";
 import { createPlanForPeriod } from "@/lib/plans/mutations";
 import { addDays, canEditPeriod, getPeriodBounds } from "@/lib/periods";
 import {
@@ -52,7 +57,8 @@ export async function createReportAction(
   });
 
   if (!parsed.success) {
-    return { error: "Invalid report parameters." };
+    const dict = await getActionDictionary();
+    return { error: dict.errors.invalidReportParameters };
   }
 
   const report = await createReportForPeriod(
@@ -82,9 +88,7 @@ export async function checkOffPlanItemAction(
     revalidatePath(`/my-reports/${reportId}`);
     return { success: true, entryId: entry.id };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to check off item.",
-    };
+    return { error: await actionError("unableToCheckOffItem", error) };
   }
 }
 
@@ -104,9 +108,7 @@ export async function uncheckPlanItemAction(
     revalidatePath(`/my-reports/${reportId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to uncheck item.",
-    };
+    return { error: await actionError("unableToUncheckItem", error) };
   }
 }
 
@@ -128,10 +130,7 @@ export async function setPlanItemOutcomeAction(
     revalidatePath(`/my-reports/${reportId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Unable to update plan item.",
-    };
+    return { error: await actionError("unableToUpdatePlanItem", error) };
   }
 }
 
@@ -149,8 +148,7 @@ export async function addUnplannedEntryAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0]?.message ?? "Invalid input.";
-    return { error: firstError };
+    return { error: await firstValidationError(parsed.error) };
   }
 
   try {
@@ -163,9 +161,7 @@ export async function addUnplannedEntryAction(
     revalidatePath(`/my-reports/${reportId}`);
     return { success: true, entryId: entry.id };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to add entry.",
-    };
+    return { error: await actionError("unableToAddEntry", error) };
   }
 }
 
@@ -182,8 +178,7 @@ export async function updateReportEntryAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0]?.message ?? "Invalid input.";
-    return { error: firstError };
+    return { error: await firstValidationError(parsed.error) };
   }
 
   try {
@@ -197,9 +192,7 @@ export async function updateReportEntryAction(
     revalidatePath(`/my-reports/${reportId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to update entry.",
-    };
+    return { error: await actionError("unableToUpdateEntry", error) };
   }
 }
 
@@ -219,9 +212,7 @@ export async function deleteReportEntryAction(
     revalidatePath(`/my-reports/${reportId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to delete entry.",
-    };
+    return { error: await actionError("unableToDeleteEntry", error) };
   }
 }
 
@@ -240,9 +231,7 @@ export async function submitReportAction(reportId: string): Promise<ActionResult
     revalidatePath("/my-plans");
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to submit report.",
-    };
+    return { error: await actionError("unableToSubmitReport", error) };
   }
 }
 
@@ -250,9 +239,10 @@ export async function openTomorrowPlanAction(
   reportDay: string,
 ): Promise<ActionResult> {
   const session = await requireSession();
+  const dict = await getActionDictionary();
   const parsed = dateStringSchema.safeParse(reportDay);
   if (!parsed.success) {
-    return { error: "Invalid date." };
+    return { error: dict.errors.invalidDate };
   }
 
   const tomorrow = addDays(parsed.data, 1);
@@ -260,7 +250,7 @@ export async function openTomorrowPlanAction(
   try {
     const bounds = getPeriodBounds(PeriodType.DAILY, tomorrow);
     if (!canEditPeriod(PeriodType.DAILY, bounds.periodStart, bounds.periodEnd)) {
-      return { error: "Tomorrow’s plan is outside the daily edit window." };
+      return { error: dict.errors.tomorrowPlanOutsideWindow };
     }
 
     const plan = await createPlanForPeriod(
@@ -275,10 +265,7 @@ export async function openTomorrowPlanAction(
     if (error && typeof error === "object" && "digest" in error) {
       throw error;
     }
-    return {
-      error:
-        error instanceof Error ? error.message : "Unable to open tomorrow’s plan.",
-    };
+    return { error: await actionError("unableToOpenTomorrowsPlan", error) };
   }
 }
 
@@ -294,9 +281,7 @@ export async function deleteReportAction(reportId: string): Promise<ActionResult
     revalidatePath("/my-reports");
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to delete report.",
-    };
+    return { error: await actionError("unableToDeleteReport", error) };
   }
 }
 
@@ -309,7 +294,8 @@ export async function uploadAttachmentAction(
   const file = formData.get("file");
 
   if (!(file instanceof File)) {
-    return { error: "No file selected." };
+    const dict = await getActionDictionary();
+    return { error: dict.errors.noFileSelected };
   }
 
   try {
@@ -323,9 +309,7 @@ export async function uploadAttachmentAction(
     revalidatePath(`/my-reports/${reportId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to upload file.",
-    };
+    return { error: await actionError("unableToUploadFile", error) };
   }
 }
 
@@ -345,8 +329,6 @@ export async function deleteAttachmentAction(
     revalidatePath(`/my-reports/${reportId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to delete attachment.",
-    };
+    return { error: await actionError("unableToDeleteAttachment", error) };
   }
 }

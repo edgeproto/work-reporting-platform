@@ -7,6 +7,11 @@ import { z } from "zod";
 import { PeriodType } from "@/app/generated/prisma/enums";
 import { requireSession } from "@/lib/auth";
 import {
+  actionError,
+  firstValidationError,
+  getActionDictionary,
+} from "@/lib/i18n/action-dictionary";
+import {
   addPlanItem,
   createPlanForPeriod,
   deletePlan,
@@ -49,7 +54,8 @@ export async function createPlanAction(
   });
 
   if (!parsed.success) {
-    return { error: "Invalid plan parameters." };
+    const dict = await getActionDictionary();
+    return { error: dict.errors.invalidPlanParameters };
   }
 
   const plan = await createPlanForPeriod(
@@ -72,7 +78,8 @@ export async function updateContinuousNotesAction(
   const parsed = continuousNotesSchema.safeParse(continuousNotes);
 
   if (!parsed.success) {
-    return { error: "Notes are too long." };
+    const dict = await getActionDictionary();
+    return { error: dict.errors.notesTooLong };
   }
 
   try {
@@ -85,9 +92,7 @@ export async function updateContinuousNotesAction(
     revalidatePath(`/my-plans/${planId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to save notes.",
-    };
+    return { error: await actionError("unableToSaveNotes", error) };
   }
 }
 
@@ -104,8 +109,7 @@ export async function addPlanItemAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0]?.message ?? "Invalid input.";
-    return { error: firstError };
+    return { error: await firstValidationError(parsed.error) };
   }
 
   try {
@@ -119,9 +123,7 @@ export async function addPlanItemAction(
     revalidatePath("/");
     return { success: true, itemId: item.id };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to add item.",
-    };
+    return { error: await actionError("unableToAddItem", error) };
   }
 }
 
@@ -139,8 +141,7 @@ export async function updatePlanItemAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0]?.message ?? "Invalid input.";
-    return { error: firstError };
+    return { error: await firstValidationError(parsed.error) };
   }
 
   try {
@@ -155,9 +156,7 @@ export async function updatePlanItemAction(
     revalidatePath("/dashboard");
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to update item.",
-    };
+    return { error: await actionError("unableToUpdateItem", error) };
   }
 }
 
@@ -176,9 +175,7 @@ export async function deletePlanItemAction(
     revalidatePath(`/my-plans/${planId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to delete item.",
-    };
+    return { error: await actionError("unableToDeleteItem", error) };
   }
 }
 
@@ -196,9 +193,7 @@ export async function submitPlanAction(planId: string): Promise<ActionResult> {
     revalidatePath(`/my-plans/${planId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to submit plan.",
-    };
+    return { error: await actionError("unableToSubmitPlan", error) };
   }
 }
 
@@ -216,9 +211,7 @@ export async function reopenPlanAction(planId: string): Promise<ActionResult> {
     revalidatePath(`/my-plans/${planId}`);
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to reopen plan.",
-    };
+    return { error: await actionError("unableToReopenPlan", error) };
   }
 }
 
@@ -235,9 +228,7 @@ export async function deletePlanAction(planId: string): Promise<ActionResult> {
     revalidatePath("/my-plans");
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to delete plan.",
-    };
+    return { error: await actionError("unableToDeletePlan", error) };
   }
 }
 
@@ -250,7 +241,8 @@ export async function uploadPlanItemAttachmentAction(
   const file = formData.get("file");
 
   if (!(file instanceof File)) {
-    return { error: "No file selected." };
+    const dict = await getActionDictionary();
+    return { error: dict.errors.noFileSelected };
   }
 
   try {
@@ -265,9 +257,7 @@ export async function uploadPlanItemAttachmentAction(
     revalidatePath("/");
     return { success: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to upload file.",
-    };
+    return { error: await actionError("unableToUploadFile", error) };
   }
 }
 
@@ -288,9 +278,6 @@ export async function deletePlanItemAttachmentAction(
     revalidatePath("/");
     return { success: true };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Unable to delete attachment.",
-    };
+    return { error: await actionError("unableToDeleteAttachment", error) };
   }
 }

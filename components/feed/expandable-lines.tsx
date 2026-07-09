@@ -132,13 +132,19 @@ export function ExpandMoreButton({
   onToggle: () => void;
   label: string;
 }) {
+  const dict = useDictionary();
+
   return (
     <Button
       type="button"
       variant="ghost"
       size="icon-sm"
       onClick={onToggle}
-      aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
+      aria-label={
+        expanded
+          ? formatMessage(dict.common.collapseItem, { label })
+          : formatMessage(dict.common.expandItem, { label })
+      }
       aria-expanded={expanded}
     >
       <MoreHorizontal className="size-4" />

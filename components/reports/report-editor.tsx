@@ -36,6 +36,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useDictionary, useI18n } from "@/components/i18n-provider";
 import { formatMessage } from "@/lib/i18n/format";
+import { formatFileSize } from "@/lib/i18n/format-file-size";
 import { periodTypeLabel } from "@/lib/i18n/period-labels";
 import { formatPeriodLabel } from "@/lib/periods";
 
@@ -120,14 +121,14 @@ export function ReportEditor({ report }: ReportEditorProps) {
   const isWeeklyOrMonthly =
     report.type === PeriodType.WEEKLY || report.type === PeriodType.MONTHLY;
   const entriesSectionTitle = isWeeklyOrMonthly
-    ? "Report entries"
-    : "Unplanned work";
+    ? dict.reports.entriesTitle
+    : dict.reports.unplannedTitle;
   const entriesSectionDescription = isWeeklyOrMonthly
-    ? "Work logged for this period. Add entries manually below."
-    : "Work that was not on your plan, or entries you add directly.";
+    ? dict.reports.entriesDescription
+    : dict.reports.unplannedDescription;
   const emptyEntriesMessage = isWeeklyOrMonthly
-    ? "No entries yet. Add work below."
-    : "No unplanned entries yet.";
+    ? dict.reports.entriesEmpty
+    : dict.reports.unplannedEmpty;
 
   return (
     <div className="space-y-6">
@@ -144,7 +145,9 @@ export function ReportEditor({ report }: ReportEditorProps) {
           <ReportStatusBadge status={report.status} />
           {totalHours > 0 ? (
             <span className="text-sm text-muted-foreground">
-              {totalHours.toFixed(1)} h total
+              {formatMessage(dict.reports.totalHours, {
+                hours: totalHours.toFixed(1),
+              })}
             </span>
           ) : null}
           <DeleteReportButton reportId={report.id} variant="destructive" />
@@ -154,17 +157,14 @@ export function ReportEditor({ report }: ReportEditorProps) {
       {report.matchingPlan ? (
         <Card>
           <CardHeader>
-            <CardTitle>From your plan</CardTitle>
-            <CardDescription>
-              Mark each plan item as completed, failed, or cancelled. Completed
-              items need hours logged below.
-            </CardDescription>
+            <CardTitle>{dict.reports.fromPlanTitle}</CardTitle>
+            <CardDescription>{dict.reports.fromPlanDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {report.matchingPlan.continuousNotes.trim() ? (
               <div className="rounded-lg border bg-muted/30 px-4 py-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Ongoing work (from plan)
+                  {dict.reports.ongoingWork}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap text-sm">
                   {report.matchingPlan.continuousNotes}
@@ -174,7 +174,7 @@ export function ReportEditor({ report }: ReportEditorProps) {
 
             {report.matchingPlan.items.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Your submitted plan has no items.
+                {dict.reports.fromPlanEmpty}
               </p>
             ) : (
               <ul className="divide-y rounded-lg border">
@@ -194,8 +194,7 @@ export function ReportEditor({ report }: ReportEditorProps) {
         </Card>
       ) : (
         <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-          No submitted plan for this period. Add unplanned work below, or file a
-          plan first and submit it to enable check-off here.
+          {dict.reports.noPlanMessage}
         </p>
       )}
 
@@ -232,8 +231,7 @@ export function ReportEditor({ report }: ReportEditorProps) {
 
       {!report.periodEditable && report.status === SubmissionStatus.DRAFT ? (
         <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-          This period is outside the edit window — this draft cannot be changed
-          or submitted.
+          {dict.reports.outsideEditWindow}
         </p>
       ) : null}
 
@@ -264,6 +262,7 @@ function PlanChecklistRow({
   currentReportId: string;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -304,7 +303,7 @@ function PlanChecklistRow({
               ) : null}
               {resolvedElsewhere ? (
                 <span className="text-xs text-muted-foreground">
-                  Resolved in another report
+                  {dict.reports.resolvedElsewhere}
                 </span>
               ) : null}
             </div>
@@ -314,7 +313,13 @@ function PlanChecklistRow({
           </div>
 
           {!resolvedElsewhere && !readOnly ? (
-            <div className="flex flex-wrap gap-1.5">
+            <div
+              className="flex flex-wrap gap-1.5"
+              role="group"
+              aria-label={formatMessage(dict.reports.checkOffItem, {
+                title: item.title,
+              })}
+            >
               {(
                 [
                   PlanItemOutcome.OPEN,
@@ -332,12 +337,12 @@ function PlanChecklistRow({
                   disabled={disabled}
                 >
                   {outcome === PlanItemOutcome.OPEN
-                    ? "Open"
+                    ? dict.badges.open
                     : outcome === PlanItemOutcome.COMPLETED
-                      ? "Completed"
+                      ? dict.badges.completed
                       : outcome === PlanItemOutcome.FAILED
-                        ? "Failed"
-                        : "Cancelled"}
+                        ? dict.badges.failed
+                        : dict.badges.cancelled}
                 </Button>
               ))}
             </div>
@@ -356,8 +361,8 @@ function PlanChecklistRow({
               currentOutcome === PlanItemOutcome.CANCELLED) ? (
             <p className="text-sm text-muted-foreground">
               {currentOutcome === PlanItemOutcome.FAILED
-                ? "Tried but did not succeed — no hours required."
-                : "Decided not to pursue — no hours required."}
+                ? dict.reports.failedNote
+                : dict.reports.cancelledNote}
             </p>
           ) : null}
 
@@ -380,6 +385,7 @@ function ReportEntryCard({
   allowDelete?: boolean;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -411,7 +417,9 @@ function ReportEntryCard({
             size="icon-sm"
             onClick={handleDelete}
             disabled={isPending}
-            aria-label={`Delete ${entry.title}`}
+            aria-label={formatMessage(dict.common.deleteItem, {
+              title: entry.title,
+            })}
           >
             <Trash2 />
           </Button>
@@ -433,6 +441,7 @@ function ReportEntryFields({
   readOnly: boolean;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [description, setDescription] = useState(entry.description ?? "");
   const [hours, setHours] = useState(entry.hours);
   const [visibility, setVisibility] = useState(entry.visibility);
@@ -468,11 +477,13 @@ function ReportEntryFields({
     return (
       <div className="space-y-3">
         <div className="grid gap-2 text-sm sm:grid-cols-[auto_1fr]">
-          <span className="text-muted-foreground">Hours</span>
+          <span className="text-muted-foreground">{dict.common.hours}</span>
           <span>{Number(entry.hours).toFixed(1)}</span>
           {entry.description ? (
             <>
-              <span className="text-muted-foreground">Description</span>
+              <span className="text-muted-foreground">
+                {dict.common.description}
+              </span>
               <span className="whitespace-pre-wrap">{entry.description}</span>
             </>
           ) : null}
@@ -491,7 +502,7 @@ function ReportEntryFields({
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
-        <Label htmlFor={`hours-${entry.id}`}>Hours</Label>
+        <Label htmlFor={`hours-${entry.id}`}>{dict.common.hours}</Label>
         <Input
           id={`hours-${entry.id}`}
           type="number"
@@ -509,7 +520,9 @@ function ReportEntryFields({
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor={`visibility-${entry.id}`}>Visibility</Label>
+        <Label htmlFor={`visibility-${entry.id}`}>
+          {dict.common.visibility}
+        </Label>
         <select
           id={`visibility-${entry.id}`}
           value={visibility}
@@ -521,12 +534,12 @@ function ReportEntryFields({
           disabled={isPending}
           className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
         >
-          <option value="PUBLIC">Public</option>
-          <option value="PRIVATE">Private</option>
+          <option value="PUBLIC">{dict.badges.public}</option>
+          <option value="PRIVATE">{dict.badges.private}</option>
         </select>
       </div>
       <div className="space-y-1.5 sm:col-span-2">
-        <Label htmlFor={`desc-${entry.id}`}>Description</Label>
+        <Label htmlFor={`desc-${entry.id}`}>{dict.common.description}</Label>
         <Textarea
           id={`desc-${entry.id}`}
           value={description}
@@ -537,13 +550,15 @@ function ReportEntryFields({
           onBlur={save}
           rows={2}
           disabled={isPending}
-          placeholder="What did you accomplish?"
+          placeholder={dict.reports.descriptionPlaceholder}
         />
       </div>
       {error ? (
         <p className="text-sm text-destructive sm:col-span-2">{error}</p>
       ) : saved ? (
-        <p className="text-xs text-muted-foreground sm:col-span-2">Saved</p>
+        <p className="text-xs text-muted-foreground sm:col-span-2">
+          {dict.reports.saved}
+        </p>
       ) : null}
       </div>
       <EntryAttachments
@@ -554,16 +569,6 @@ function ReportEntryFields({
       />
     </div>
   );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function EntryAttachments({
@@ -578,6 +583,7 @@ function EntryAttachments({
   readOnly: boolean;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -618,7 +624,7 @@ function EntryAttachments({
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         <Paperclip className="size-3.5" />
-        Attachments
+        {dict.plans.attachments}
       </div>
 
       {attachments.length > 0 ? (
@@ -636,7 +642,7 @@ function EntryAttachments({
                 <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{attachment.fileName}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {formatFileSize(attachment.sizeBytes)}
+                  {formatFileSize(attachment.sizeBytes, dict)}
                 </span>
               </a>
               {!readOnly ? (
@@ -646,7 +652,9 @@ function EntryAttachments({
                   size="icon-sm"
                   onClick={() => handleDelete(attachment.id)}
                   disabled={isPending}
-                  aria-label={`Remove ${attachment.fileName}`}
+                  aria-label={formatMessage(dict.common.removeFile, {
+                    fileName: attachment.fileName,
+                  })}
                 >
                   <X />
                 </Button>
@@ -655,7 +663,7 @@ function EntryAttachments({
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-muted-foreground">No attachments.</p>
+        <p className="text-xs text-muted-foreground">{dict.plans.noAttachments}</p>
       )}
 
       {!readOnly ? (
@@ -665,7 +673,7 @@ function EntryAttachments({
             className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-normal text-primary hover:underline"
           >
             <Upload className="size-3.5" />
-            {isPending ? "Uploading…" : "Upload file"}
+            {isPending ? dict.plans.uploading : dict.plans.uploadFile}
           </Label>
           <input
             id={`upload-${entryId}`}
@@ -676,7 +684,7 @@ function EntryAttachments({
             className="sr-only"
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            PDF, images, Office docs, or plain text. Max 10 MB.
+            {dict.reports.attachmentsHint}
           </p>
         </div>
       ) : null}
@@ -688,6 +696,7 @@ function EntryAttachments({
 
 function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [hours, setHours] = useState("");
@@ -723,21 +732,21 @@ function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <p className="text-sm font-medium">Add unplanned entry</p>
+      <p className="text-sm font-medium">{dict.reports.addEntryTitle}</p>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="unplanned-title">Title</Label>
+          <Label htmlFor="unplanned-title">{dict.common.title}</Label>
           <Input
             id="unplanned-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="What did you work on?"
+            placeholder={dict.reports.addEntryPlaceholder}
             required
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="unplanned-hours">Hours</Label>
+          <Label htmlFor="unplanned-hours">{dict.common.hours}</Label>
           <Input
             id="unplanned-hours"
             type="number"
@@ -750,7 +759,7 @@ function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="unplanned-visibility">Visibility</Label>
+          <Label htmlFor="unplanned-visibility">{dict.common.visibility}</Label>
           <select
             id="unplanned-visibility"
             value={visibility}
@@ -759,24 +768,24 @@ function AddUnplannedEntryForm({ reportId }: { reportId: string }) {
             }
             className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
           >
-            <option value="PUBLIC">Public</option>
-            <option value="PRIVATE">Private</option>
+            <option value="PUBLIC">{dict.badges.public}</option>
+            <option value="PRIVATE">{dict.badges.private}</option>
           </select>
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="unplanned-description">Description</Label>
+          <Label htmlFor="unplanned-description">{dict.common.description}</Label>
           <Textarea
             id="unplanned-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            placeholder="What did you accomplish?"
+            placeholder={dict.reports.descriptionPlaceholder}
           />
         </div>
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" disabled={isPending || !canSubmit}>
-        {isPending ? "Adding…" : "Add entry"}
+        {isPending ? dict.reports.adding : dict.reports.addEntry}
       </Button>
     </form>
   );
@@ -800,6 +809,7 @@ function ReportActions({
   matchingPlan: SerializedMatchingPlan | null;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -850,26 +860,25 @@ function ReportActions({
         <CardContent className="space-y-4 pt-6">
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <Lock className="size-4" />
-            This report has been submitted and is read-only.
+            {dict.reports.submittedMessage}
           </div>
           {matchingPlan && planItemCount > 0 ? (
             <p className="text-sm text-muted-foreground">
-              Plan checklist: {resolvedCount}/{planItemCount} items resolved in
-              this report.
+              {formatMessage(dict.reports.checklist, {
+                resolved: resolvedCount,
+                total: planItemCount,
+              })}
             </p>
           ) : null}
           {canFileTomorrowPlan ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
-              <p className="text-sm">
-                Ready for tomorrow? File tomorrow&apos;s plan while the daily
-                window is open.
-              </p>
+              <p className="text-sm">{dict.reports.tomorrowPrompt}</p>
               <Button
                 type="button"
                 onClick={handleTomorrowPlan}
                 disabled={isPending}
               >
-                {isPending ? "Opening…" : "File tomorrow’s plan"}
+                {isPending ? dict.reports.tomorrowOpening : dict.reports.tomorrowFile}
               </Button>
             </div>
           ) : null}
@@ -884,7 +893,7 @@ function ReportActions({
       <Card>
         <CardContent className="flex items-center gap-2 pt-6 text-sm text-muted-foreground">
           <Lock className="size-4" />
-          This draft is outside the edit window and cannot be submitted.
+          {dict.reports.draftOutsideWindow}
         </CardContent>
       </Card>
     );
@@ -895,17 +904,17 @@ function ReportActions({
       <CardFooter className="flex flex-wrap items-center justify-between gap-4 border-t-0 bg-transparent">
         <p className="text-sm text-muted-foreground">
           {!hasEntries
-            ? "Add at least one report entry before you can submit."
+            ? dict.reports.submitNeedEntries
             : !allEntriesValid
-              ? "Completed items and unplanned entries need hours greater than zero."
-              : "Submit when ready — plan outcomes will be saved and public entries will be visible to your team."}
+              ? dict.reports.submitNeedHours
+              : dict.reports.submitReady}
         </p>
         <Button
           type="button"
           onClick={handleSubmit}
           disabled={isPending || !canSubmit}
         >
-          {isPending ? "Submitting…" : "Submit report"}
+          {isPending ? dict.reports.submitting : dict.reports.submit}
         </Button>
         {error ? <p className="w-full text-sm text-destructive">{error}</p> : null}
       </CardFooter>
