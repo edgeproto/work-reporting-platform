@@ -10,6 +10,7 @@ import {
   uploadAvatarAction,
   type SettingsActionResult,
 } from "@/app/(dashboard)/settings/actions";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { Locale } from "@/lib/i18n/locales";
 
 type ProfileFormProps = {
   user: {
@@ -30,9 +32,15 @@ type ProfileFormProps = {
     hasAvatar: boolean;
     hasPassword: boolean;
   };
+  locale: Locale;
+  languageLabel: string;
 };
 
-export function SettingsProfileForms({ user }: ProfileFormProps) {
+export function SettingsProfileForms({
+  user,
+  locale,
+  languageLabel,
+}: ProfileFormProps) {
   return (
     <div className="space-y-6">
       <AvatarCard userId={user.id} hasAvatar={user.hasAvatar} />
@@ -41,8 +49,35 @@ export function SettingsProfileForms({ user }: ProfileFormProps) {
         email={user.email}
         roleLabel={user.roleLabel}
       />
+      <LanguageCard locale={locale} languageLabel={languageLabel} />
       <PasswordCard hasPassword={user.hasPassword} />
     </div>
+  );
+}
+
+function LanguageCard({
+  locale,
+  languageLabel,
+}: {
+  locale: Locale;
+  languageLabel: string;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Language</CardTitle>
+        <CardDescription>
+          Choose the language used across the app interface.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <LanguageSwitcher
+          locale={locale}
+          label={languageLabel}
+          variant="settings"
+        />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -165,10 +200,17 @@ function ProfileCard({
   roleLabel: string;
 }) {
   const router = useRouter();
+  const [nameValue, setNameValue] = useState(name);
+  const [emailValue, setEmailValue] = useState(email);
   const [state, formAction, pending] = useActionState<
     SettingsActionResult,
     FormData
   >(updateProfileAction, {});
+
+  useEffect(() => {
+    setNameValue(name);
+    setEmailValue(email);
+  }, [name, email]);
 
   useEffect(() => {
     if (state.success) {
@@ -191,7 +233,8 @@ function ProfileCard({
             <Input
               id="settings-name"
               name="name"
-              defaultValue={name}
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
               required
               maxLength={100}
             />
@@ -207,7 +250,8 @@ function ProfileCard({
               id="settings-email"
               name="email"
               type="email"
-              defaultValue={email}
+              value={emailValue}
+              onChange={(e) => setEmailValue(e.target.value)}
               required
             />
             {state.fieldErrors?.email?.[0] ? (

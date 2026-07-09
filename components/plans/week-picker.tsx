@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { useDictionary, useI18n } from "@/components/i18n-provider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,11 +18,21 @@ type WeekPickerProps = {
 };
 
 export function WeekPicker({ id, value, onChange }: WeekPickerProps) {
+  const { locale } = useI18n();
+  const dict = useDictionary();
   const month = weekPickerMonthFromReference(value);
-  const weeks = useMemo(() => listWeeksInMonth(month), [month]);
+  const weeks = useMemo(
+    () => listWeeksInMonth(month, undefined, locale, dict.periods.weekOption),
+    [month, locale, dict.periods.weekOption],
+  );
 
   const handleMonthChange = (monthValue: string) => {
-    const weeksInMonth = listWeeksInMonth(monthValue);
+    const weeksInMonth = listWeeksInMonth(
+      monthValue,
+      undefined,
+      locale,
+      dict.periods.weekOption,
+    );
     const nextSunday = weeksInMonth[0]?.sunday ?? value;
     onChange(sundayFromWeekPicker(monthValue, nextSunday));
   };
@@ -33,7 +44,9 @@ export function WeekPicker({ id, value, onChange }: WeekPickerProps) {
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="space-y-1.5">
-        <Label htmlFor={id ? `${id}-month` : "week-month"}>Month</Label>
+        <Label htmlFor={id ? `${id}-month` : "week-month"}>
+          {dict.periods.picker.month}
+        </Label>
         <Input
           id={id ? `${id}-month` : "week-month"}
           type="month"
@@ -44,7 +57,9 @@ export function WeekPicker({ id, value, onChange }: WeekPickerProps) {
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor={id ? `${id}-week` : "week-select"}>Week</Label>
+        <Label htmlFor={id ? `${id}-week` : "week-select"}>
+          {dict.periods.picker.week}
+        </Label>
         <select
           id={id ? `${id}-week` : "week-select"}
           value={weeks.some((w) => w.sunday === value) ? value : weeks[0]?.sunday ?? ""}

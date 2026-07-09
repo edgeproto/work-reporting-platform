@@ -11,6 +11,7 @@ import {
   itemHasMoreLines,
   useExpandableItems,
 } from "@/components/feed/expandable-lines";
+import { useDictionary } from "@/components/i18n-provider";
 import { PlanItemOutcomeBadge, PlanStatusBadge, VisibilityBadge } from "@/components/plans/plan-badges";
 import { ReportStatusBadge } from "@/components/reports/report-badges";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +22,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatMessage } from "@/lib/i18n/format";
 import type { FeedPeriodCard, MyFeedData } from "@/lib/my-feed/types";
 
 function MissingBadge() {
-  return <Badge variant="outline">Missing</Badge>;
+  const dict = useDictionary();
+  return <Badge variant="outline">{dict.badges.missing}</Badge>;
 }
 
 function feedCardId(card: FeedPeriodCard): string {
@@ -40,6 +43,7 @@ function FeedCard({
   expanded: boolean;
   onToggleExpand: () => void;
 }) {
+  const dict = useDictionary();
   const planLineCount = card.plan?.lines.length ?? 0;
   const reportLineCount = card.report?.lines.length ?? 0;
   const canExpand = itemHasMoreLines(planLineCount, reportLineCount);
@@ -63,7 +67,7 @@ function FeedCard({
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Plan
+              {dict.common.plan}
             </p>
             {card.plan ? (
               <>
@@ -76,7 +80,10 @@ function FeedCard({
                 />
                 {card.plan.lines.length > 0 ? (
                   <span className="text-xs text-muted-foreground">
-                    {card.plan.completedCount}/{card.plan.lines.length} completed
+                    {formatMessage(dict.feed.completed, {
+                      completed: card.plan.completedCount,
+                      total: card.plan.lines.length,
+                    })}
                   </span>
                 ) : null}
               </>
@@ -89,7 +96,7 @@ function FeedCard({
               <ExpandableLineList
                 lines={card.plan.lines}
                 expanded={expanded}
-                emptyLabel="No plan items."
+                emptyLabel={dict.feed.noPlanItems}
                 lineKey={(line, index) => `${line.title}-${index}`}
                 renderLine={(line) => (
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -105,7 +112,7 @@ function FeedCard({
                 href={`/my-plans/${card.plan.id}`}
                 className="text-sm font-medium text-primary hover:underline"
               >
-                Open plan
+                {dict.feed.openPlan}
               </Link>
             </div>
           ) : null}
@@ -114,7 +121,7 @@ function FeedCard({
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Report
+              {dict.common.report}
             </p>
             {card.report ? (
               <>
@@ -127,7 +134,9 @@ function FeedCard({
                 />
                 {card.report.lines.length > 0 ? (
                   <span className="text-xs text-muted-foreground">
-                    {card.report.totalHours.toFixed(1)} h
+                    {formatMessage(dict.feed.hoursShort, {
+                      hours: card.report.totalHours.toFixed(1),
+                    })}
                   </span>
                 ) : null}
               </>
@@ -140,13 +149,15 @@ function FeedCard({
               <ExpandableLineList
                 lines={card.report.lines}
                 expanded={expanded}
-                emptyLabel="No report entries."
+                emptyLabel={dict.feed.noReportEntries}
                 lineKey={(line, index) => `${line.title}-${index}`}
                 renderLine={(line) => (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate">{line.title}</span>
                     <span className="text-xs text-muted-foreground">
-                      {line.hours.toFixed(1)} h
+                      {formatMessage(dict.feed.hoursShort, {
+                        hours: line.hours.toFixed(1),
+                      })}
                     </span>
                     <VisibilityBadge visibility={line.visibility} />
                   </div>
@@ -156,7 +167,7 @@ function FeedCard({
                 href={`/my-reports/${card.report.id}`}
                 className="text-sm font-medium text-primary hover:underline"
               >
-                Open report
+                {dict.feed.openReport}
               </Link>
             </div>
           ) : null}
@@ -193,6 +204,7 @@ function FeedColumn({
 }
 
 export function MyFeed({ data }: { data: MyFeedData }) {
+  const dict = useDictionary();
   const allCards = useMemo(
     () => [...data.daily, ...data.weekly],
     [data.daily, data.weekly],
@@ -228,9 +240,9 @@ export function MyFeed({ data }: { data: MyFeedData }) {
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <section className="min-w-0 space-y-3">
           <div>
-            <h2 className="text-lg font-medium">Last 7 days</h2>
+            <h2 className="text-lg font-medium">{dict.feed.dailyTitle}</h2>
             <p className="text-sm text-muted-foreground">
-              Daily plans and reports, including today.
+              {dict.feed.dailyDescription}
             </p>
           </div>
           <FeedColumn
@@ -242,9 +254,9 @@ export function MyFeed({ data }: { data: MyFeedData }) {
 
         <section className="min-w-0 space-y-3">
           <div>
-            <h2 className="text-lg font-medium">Last 5 weeks</h2>
+            <h2 className="text-lg font-medium">{dict.feed.weeklyTitle}</h2>
             <p className="text-sm text-muted-foreground">
-              Weekly plans and reports, including this week.
+              {dict.feed.weeklyDescription}
             </p>
           </div>
           <FeedColumn

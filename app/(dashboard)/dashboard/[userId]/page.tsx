@@ -21,7 +21,9 @@ import { formatDashboardTimestamp } from "@/lib/dashboard/period";
 import { isManagerOrAbove } from "@/lib/rbac";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { getLocale } from "@/lib/i18n/get-locale";
-import { formatPeriodLabel, periodTypeLabel } from "@/lib/periods";
+import { formatMessage } from "@/lib/i18n/format";
+import { periodTypeLabel } from "@/lib/i18n/period-labels";
+import { formatPeriodLabel } from "@/lib/periods";
 
 type PageProps = {
   params: Promise<{ userId: string }>;
@@ -78,6 +80,9 @@ export default async function MemberDashboardPage({
     filters.periodType,
     filters.periodStart,
     filters.periodEnd,
+    undefined,
+    locale,
+    dict.periods,
   );
   const showTimestamps = isManagerOrAbove(viewer);
 
@@ -131,13 +136,18 @@ export default async function MemberDashboardPage({
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                {periodTypeLabel(detail.plan.type)} plan
+                {formatMessage(dict.dashboard.planTitle, {
+                  type: periodTypeLabel(detail.plan.type, dict),
+                })}
               </CardTitle>
               <CardDescription>
                 {formatPeriodLabel(
                   detail.plan.type,
                   detail.plan.periodStart,
                   detail.plan.periodEnd,
+                  undefined,
+                  locale,
+                  dict.periods,
                 )}
               </CardDescription>
             </CardHeader>
@@ -185,13 +195,18 @@ export default async function MemberDashboardPage({
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                {periodTypeLabel(detail.report.type)} report
+                {formatMessage(dict.dashboard.reportTitle, {
+                  type: periodTypeLabel(detail.report.type, dict),
+                })}
               </CardTitle>
               <CardDescription>
                 {formatPeriodLabel(
                   detail.report.type,
                   detail.report.periodStart,
                   detail.report.periodEnd,
+                  undefined,
+                  locale,
+                  dict.periods,
                 )}
               </CardDescription>
             </CardHeader>

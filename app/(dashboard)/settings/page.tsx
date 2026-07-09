@@ -26,12 +26,12 @@ export default async function SettingsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {dict.nav.settings}
         </h1>
-        <p className="text-muted-foreground">
-          Manage your personal profile, password, and avatar.
-        </p>
+        <p className="text-muted-foreground">{dict.settings.subtitle}</p>
       </div>
 
       <SettingsProfileForms
+        locale={locale}
+        languageLabel={dict.header.language}
         user={{
           id: profile.id,
           name: profile.name,

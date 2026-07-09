@@ -1,11 +1,16 @@
+"use client";
+
 import { PlanItemOutcome, SubmissionStatus } from "@/app/generated/prisma/enums";
+import { useDictionary } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui/badge";
 
 export function PlanStatusBadge({ status }: { status: SubmissionStatus }) {
+  const dict = useDictionary();
+
   if (status === SubmissionStatus.SUBMITTED) {
-    return <Badge variant="default">Submitted</Badge>;
+    return <Badge variant="default">{dict.badges.submitted}</Badge>;
   }
-  return <Badge variant="secondary">Draft</Badge>;
+  return <Badge variant="secondary">{dict.badges.draft}</Badge>;
 }
 
 export function PlanItemOutcomeBadge({
@@ -13,6 +18,8 @@ export function PlanItemOutcomeBadge({
 }: {
   outcome: PlanItemOutcome;
 }) {
+  const dict = useDictionary();
+
   if (outcome === PlanItemOutcome.OPEN) {
     return null;
   }
@@ -26,17 +33,23 @@ export function PlanItemOutcomeBadge({
 
   const label =
     outcome === PlanItemOutcome.COMPLETED
-      ? "Completed"
+      ? dict.badges.completed
       : outcome === PlanItemOutcome.FAILED
-        ? "Failed"
-        : "Cancelled";
+        ? dict.badges.failed
+        : dict.badges.cancelled;
 
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-export function VisibilityBadge({ visibility }: { visibility: "PUBLIC" | "PRIVATE" }) {
+export function VisibilityBadge({
+  visibility,
+}: {
+  visibility: "PUBLIC" | "PRIVATE";
+}) {
+  const dict = useDictionary();
+
   if (visibility === "PRIVATE") {
-    return <Badge variant="outline">Private</Badge>;
+    return <Badge variant="outline">{dict.badges.private}</Badge>;
   }
-  return <Badge variant="ghost">Public</Badge>;
+  return <Badge variant="ghost">{dict.badges.public}</Badge>;
 }

@@ -8,9 +8,7 @@ import {
   DashboardNav,
   type DashboardNavLink,
 } from "@/components/dashboard-nav";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
-import type { Locale } from "@/lib/i18n/locales";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE = "sidebarCollapsed";
@@ -18,8 +16,6 @@ const SIDEBAR_COOKIE = "sidebarCollapsed";
 type DashboardShellProps = {
   appTitle: string;
   navLinks: DashboardNavLink[];
-  locale: Locale;
-  languageLabel: string;
   userName: string;
   roleLabel: string;
   userId: string;
@@ -45,8 +41,6 @@ function writeCollapsedCookie(collapsed: boolean) {
 export function DashboardShell({
   appTitle,
   navLinks,
-  locale,
-  languageLabel,
   userName,
   roleLabel,
   userId,
@@ -129,7 +123,6 @@ export function DashboardShell({
         >
           {!collapsed ? (
             <>
-              <LanguageSwitcher locale={locale} label={languageLabel} />
               <div className="flex items-center gap-3 text-sm">
                 {hasAvatar ? (
                   // eslint-disable-next-line @next/next/no-img-element

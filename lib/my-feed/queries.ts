@@ -1,5 +1,7 @@
 import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import type { Locale } from "@/lib/i18n/locales";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { isPlanItemCompleted } from "@/lib/plans/outcome";
 import type {
@@ -41,32 +43,40 @@ function lastWeeklyReferences(count: number): string[] {
   return weeks;
 }
 
-function dailyHeading(referenceDate: string): string {
+function dailyHeading(
+  referenceDate: string,
+  locale: Locale,
+): string {
+  const dict = getDictionary(locale);
   const today = formatDateInTz(new Date());
   const yesterday = addDays(today, -1);
 
   if (referenceDate === today) {
-    return "Today";
+    return dict.periods.relative.today;
   }
   if (referenceDate === yesterday) {
-    return "Yesterday";
+    return dict.periods.relative.yesterday;
   }
 
   return formatPeriodLabel(
     PeriodType.DAILY,
     getPeriodBounds(PeriodType.DAILY, referenceDate).periodStart,
     getPeriodBounds(PeriodType.DAILY, referenceDate).periodEnd,
+    undefined,
+    locale,
+    dict.periods,
   );
 }
 
-function weeklyHeading(referenceDate: string): string {
+function weeklyHeading(referenceDate: string, locale: Locale): string {
+  const dict = getDictionary(locale);
   const today = formatDateInTz(new Date());
   const currentWeekStart = formatDateInTz(
     getPeriodBounds(PeriodType.WEEKLY, today).periodStart,
   );
 
   if (referenceDate === currentWeekStart) {
-    return "This week";
+    return dict.periods.relative.thisWeek;
   }
 
   const { periodStart, periodEnd } = getPeriodBounds(
@@ -74,7 +84,14 @@ function weeklyHeading(referenceDate: string): string {
     referenceDate,
   );
 
-  return formatPeriodLabel(PeriodType.WEEKLY, periodStart, periodEnd);
+  return formatPeriodLabel(
+    PeriodType.WEEKLY,
+    periodStart,
+    periodEnd,
+    undefined,
+    locale,
+    dict.periods,
+  );
 }
 
 async function loadFeedCard(
@@ -82,13 +99,22 @@ async function loadFeedCard(
   organizationId: string,
   type: PeriodType,
   referenceDate: string,
+  locale: Locale,
 ): Promise<FeedPeriodCard> {
+  const dict = getDictionary(locale);
   const { periodStart, periodEnd } = getPeriodBounds(type, referenceDate);
-  const periodLabel = formatPeriodLabel(type, periodStart, periodEnd);
+  const periodLabel = formatPeriodLabel(
+    type,
+    periodStart,
+    periodEnd,
+    undefined,
+    locale,
+    dict.periods,
+  );
   const heading =
     type === PeriodType.DAILY
-      ? dailyHeading(referenceDate)
-      : weeklyHeading(referenceDate);
+      ? dailyHeading(referenceDate, locale)
+      : weeklyHeading(referenceDate, locale);
 
   const [plan, report] = await Promise.all([
     db.plan.findUnique({
@@ -164,16 +190,29 @@ async function loadFeedCard(
 export async function loadMyFeedData(
   userId: string,
   organizationId: string,
+  locale: Locale = "en",
 ): Promise<MyFeedData> {
   const [daily, weekly] = await Promise.all([
     Promise.all(
       lastDailyReferences(7).map((referenceDate) =>
-        loadFeedCard(userId, organizationId, PeriodType.DAILY, referenceDate),
+        loadFeedCard(
+          userId,
+          organizationId,
+          PeriodType.DAILY,
+          referenceDate,
+          locale,
+        ),
       ),
     ),
     Promise.all(
       lastWeeklyReferences(5).map((referenceDate) =>
-        loadFeedCard(userId, organizationId, PeriodType.WEEKLY, referenceDate),
+        loadFeedCard(
+          userId,
+          organizationId,
+          PeriodType.WEEKLY,
+          referenceDate,
+          locale,
+        ),
       ),
     ),
   ]);

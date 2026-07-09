@@ -55,8 +55,6 @@ export default async function DashboardLayout({
     <DashboardShell
       appTitle={dict.app.title}
       navLinks={navLinks}
-      locale={locale}
-      languageLabel={dict.header.language}
       userName={session.user.name ?? session.user.email ?? "User"}
       roleLabel={roleLabel}
       userId={session.user.id}

@@ -34,7 +34,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { formatPeriodLabel, periodTypeLabel } from "@/lib/periods";
+import { useDictionary, useI18n } from "@/components/i18n-provider";
+import { formatMessage } from "@/lib/i18n/format";
+import { periodTypeLabel } from "@/lib/i18n/period-labels";
+import { formatPeriodLabel } from "@/lib/periods";
 
 export type SerializedPlanItem = {
   id: string;
@@ -88,12 +91,17 @@ type ReportEditorProps = {
 };
 
 export function ReportEditor({ report }: ReportEditorProps) {
+  const { locale } = useI18n();
+  const dict = useDictionary();
   const isEditable =
     report.status === SubmissionStatus.DRAFT && report.periodEditable;
   const periodLabel = formatPeriodLabel(
     report.type,
     new Date(report.periodStart),
     new Date(report.periodEnd),
+    undefined,
+    locale,
+    dict.periods,
   );
 
   const entriesByPlanItemId = new Map(
@@ -126,7 +134,9 @@ export function ReportEditor({ report }: ReportEditorProps) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {periodTypeLabel(report.type)} Report
+            {formatMessage(dict.reports.title, {
+              type: periodTypeLabel(report.type, dict),
+            })}
           </h1>
           <p className="text-muted-foreground">{periodLabel}</p>
         </div>

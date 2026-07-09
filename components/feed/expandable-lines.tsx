@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 
+import { useDictionary } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
+import { formatMessage } from "@/lib/i18n/format";
 
 export const FEED_INITIAL_LINES = 5;
 
@@ -20,6 +22,8 @@ export function ExpandableLineList<T>({
   emptyLabel: string;
   lineKey: (line: T, index: number) => string;
 }) {
+  const dict = useDictionary();
+
   if (lines.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
   }
@@ -35,7 +39,11 @@ export function ExpandableLineList<T>({
       {!expanded && hasMore ? (
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <MoreHorizontal className="size-3.5" aria-hidden />
-          <span>{lines.length - FEED_INITIAL_LINES} more</span>
+          <span>
+            {formatMessage(dict.feed.moreCount, {
+              count: lines.length - FEED_INITIAL_LINES,
+            })}
+          </span>
         </div>
       ) : null}
     </div>
@@ -100,6 +108,8 @@ export function ExpandAllToggleButton({
   onToggle: () => void;
   disabled?: boolean;
 }) {
+  const dict = useDictionary();
+
   return (
     <Button
       type="button"
@@ -108,7 +118,7 @@ export function ExpandAllToggleButton({
       onClick={onToggle}
       disabled={disabled}
     >
-      {expandAll ? "Collapse all" : "Expand all"}
+      {expandAll ? dict.common.collapseAll : dict.common.expandAll}
     </Button>
   );
 }

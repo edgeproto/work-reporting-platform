@@ -1,4 +1,8 @@
 import { PeriodType } from "@/app/generated/prisma/enums";
+import type { Dictionary } from "@/lib/i18n/dictionaries/en";
+import { formatMessage } from "@/lib/i18n/format";
+import { toIntlLocale } from "@/lib/i18n/intl-locale";
+import type { Locale } from "@/lib/i18n/locales";
 
 export function getOrgTimezone(): string {
   return process.env.TZ ?? "UTC";
@@ -104,8 +108,13 @@ function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-function monthName(month: number, year: number, tz: string): string {
-  return new Intl.DateTimeFormat("en-US", {
+function monthName(
+  month: number,
+  year: number,
+  tz: string,
+  locale: Locale = "en",
+): string {
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
     month: "long",
     timeZone: tz,
   }).format(parseDateString(`${year}-${String(month).padStart(2, "0")}-01`));
@@ -115,6 +124,7 @@ function monthName(month: number, year: number, tz: string): string {
 export function getWeekOfMonthInfo(
   sundayStr: string,
   tz = getOrgTimezone(),
+  locale: Locale = "en",
 ): { weekNum: number; month: number; year: number; monthLabel: string } {
   const saturdayStr = addDays(sundayStr, 6);
   const [, startMonth] = sundayStr.split("-").map(Number);
@@ -131,7 +141,7 @@ export function getWeekOfMonthInfo(
     weekNum,
     month,
     year,
-    monthLabel: monthName(month, year, tz),
+    monthLabel: monthName(month, year, tz, locale),
   };
 }
 
@@ -140,47 +150,44 @@ export function formatPeriodLabel(
   periodStart: Date,
   periodEnd: Date,
   tz = getOrgTimezone(),
+  locale: Locale = "en",
+  periodStrings?: Pick<Dictionary["periods"], "weekOf">,
 ): string {
   const start = formatDateInTz(periodStart, tz);
   const end = formatDateInTz(periodEnd, tz);
+  const weekOf =
+    periodStrings?.weekOf ?? "Week {weekNum} of {monthLabel} {year} · {start} – {end}";
 
   switch (type) {
     case PeriodType.DAILY:
-      return formatDisplayDate(start);
+      return formatDisplayDate(start, locale);
     case PeriodType.WEEKLY: {
-      const { weekNum, year, monthLabel } = getWeekOfMonthInfo(start, tz);
-      return `Week ${weekNum} of ${monthLabel} ${year} · ${formatDisplayDate(start)} – ${formatDisplayDate(end)}`;
+      const { weekNum, year, monthLabel } = getWeekOfMonthInfo(start, tz, locale);
+      return formatMessage(weekOf, {
+        weekNum,
+        year,
+        monthLabel,
+        start: formatDisplayDate(start, locale),
+        end: formatDisplayDate(end, locale),
+      });
     }
     case PeriodType.MONTHLY: {
       const [year, month] = start.split("-").map(Number);
-      return `${monthName(month, year, tz)} ${year}`;
+      return `${monthName(month, year, tz, locale)} ${year}`;
     }
     default:
       return start;
   }
 }
 
-function formatDisplayDate(dateStr: string): string {
+function formatDisplayDate(dateStr: string, locale: Locale = "en"): string {
   const date = parseDateString(dateStr);
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
     weekday: "short",
     month: "short",
     day: "numeric",
     timeZone: "UTC",
   }).format(date);
-}
-
-export function periodTypeLabel(type: PeriodType): string {
-  switch (type) {
-    case PeriodType.DAILY:
-      return "Daily";
-    case PeriodType.WEEKLY:
-      return "Weekly";
-    case PeriodType.MONTHLY:
-      return "Monthly";
-    default:
-      return type;
-  }
 }
 
 export function todayDateString(tz = getOrgTimezone()): string {
@@ -197,6 +204,8 @@ export type WeekOption = {
 export function listWeeksInMonth(
   monthValue: string,
   tz = getOrgTimezone(),
+  locale: Locale = "en",
+  weekOptionTemplate?: string,
 ): WeekOption[] {
   const match = /^(\d{4})-(\d{2})$/.exec(monthValue);
   if (!match) {
@@ -227,10 +236,16 @@ export function listWeeksInMonth(
     }
 
     const { weekNum } = getWeekOfMonthInfo(sunday, tz);
+    const weekOption =
+      weekOptionTemplate ?? "Week {weekNum}: {start} – {end}";
     weeks.push({
       sunday,
       weekNum,
-      label: `Week ${weekNum}: ${formatDisplayDate(sunday)} – ${formatDisplayDate(saturday)}`,
+      label: formatMessage(weekOption, {
+        weekNum,
+        start: formatDisplayDate(sunday, locale),
+        end: formatDisplayDate(saturday, locale),
+      }),
     });
 
     if (sunday > lastOfMonth) {
@@ -309,19 +324,6 @@ export function monthInputToReferenceDate(monthValue: string): string {
   return `${match[1]}-${match[2]}-01`;
 }
 
-export function periodPickerLabel(type: PeriodType): string {
-  switch (type) {
-    case PeriodType.DAILY:
-      return "Date";
-    case PeriodType.WEEKLY:
-      return "Week";
-    case PeriodType.MONTHLY:
-      return "Month";
-    default:
-      return "Period";
-  }
-}
-
 export function periodPickerInputType(
   type: PeriodType,
 ): "date" | "month" | "week-custom" {
@@ -370,13 +372,22 @@ export function formatPeriodPreview(
   type: PeriodType,
   referenceDate: string,
   tz = getOrgTimezone(),
+  locale: Locale = "en",
+  periodStrings?: Pick<Dictionary["periods"], "weekOf">,
 ): string | null {
   if (type === PeriodType.DAILY) {
     return null;
   }
 
   const { periodStart, periodEnd } = getPeriodBounds(type, referenceDate, tz);
-  return formatPeriodLabel(type, periodStart, periodEnd, tz);
+  return formatPeriodLabel(
+    type,
+    periodStart,
+    periodEnd,
+    tz,
+    locale,
+    periodStrings,
+  );
 }
 
 /** True when today is after the period end date. */

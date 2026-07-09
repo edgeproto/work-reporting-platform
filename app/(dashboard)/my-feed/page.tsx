@@ -12,6 +12,7 @@ export default async function MyFeedPage() {
   const data = await loadMyFeedData(
     session.user.id,
     session.user.organizationId,
+    locale,
   );
 
   return (
@@ -20,9 +21,7 @@ export default async function MyFeedPage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {dict.nav.myFeed}
         </h1>
-        <p className="text-muted-foreground">
-          Your recent daily and weekly filings side by side.
-        </p>
+        <p className="text-muted-foreground">{dict.feed.subtitle}</p>
       </div>
       <MyFeed data={data} />
     </div>

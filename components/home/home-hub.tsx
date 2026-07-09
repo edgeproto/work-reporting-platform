@@ -11,6 +11,7 @@ import {
   setHomeMonthAction,
   setHomeWeekAction,
 } from "@/app/(dashboard)/home-actions";
+import { useDictionary } from "@/components/i18n-provider";
 import { WeekPicker } from "@/components/plans/week-picker";
 import { PlanStatusBadge } from "@/components/plans/plan-badges";
 import { ReportStatusBadge } from "@/components/reports/report-badges";
@@ -26,7 +27,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { HomePeriodSectionData } from "@/lib/home/queries";
-import { periodTypeLabel } from "@/lib/periods";
+import { formatMessage } from "@/lib/i18n/format";
+import { periodTypeLabel } from "@/lib/i18n/period-labels";
 
 type HomeHubProps = {
   monthly: HomePeriodSectionData;
@@ -40,7 +42,8 @@ type HomeHubProps = {
 };
 
 function MissingBadge() {
-  return <Badge variant="outline">Missing</Badge>;
+  const dict = useDictionary();
+  return <Badge variant="outline">{dict.badges.missing}</Badge>;
 }
 
 function FilingBadges({
@@ -50,10 +53,12 @@ function FilingBadges({
   planStatus: HomePeriodSectionData["plan"];
   reportStatus: HomePeriodSectionData["report"];
 }) {
+  const dict = useDictionary();
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        Plan
+        {dict.common.plan}
         {planStatus ? (
           <PlanStatusBadge
             status={
@@ -67,7 +72,7 @@ function FilingBadges({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        Report
+        {dict.common.report}
         {reportStatus ? (
           <ReportStatusBadge
             status={
@@ -91,6 +96,7 @@ function PeriodSection({
   section: HomePeriodSectionData;
   picker: React.ReactNode;
 }) {
+  const dict = useDictionary();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -157,10 +163,12 @@ function PeriodSection({
   };
 
   const planButtonLabel =
-    planMissing && section.editable ? "Submit plan" : "View plan";
+    planMissing && section.editable ? dict.home.submitPlan : dict.home.viewPlan;
 
   const reportButtonLabel =
-    reportMissing && section.editable ? "Submit report" : "View report";
+    reportMissing && section.editable
+      ? dict.home.submitReport
+      : dict.home.viewReport;
 
   const showPlanAction = canSubmitOrEditPlan || canViewPlan;
   const showReportAction =
@@ -173,7 +181,7 @@ function PeriodSection({
     >
       <CardHeader className="space-y-3">
         <div className="space-y-1">
-          <CardTitle>{periodTypeLabel(section.type)}</CardTitle>
+          <CardTitle>{periodTypeLabel(section.type, dict)}</CardTitle>
           <CardDescription className="line-clamp-2">
             {section.periodLabel}
           </CardDescription>
@@ -182,64 +190,74 @@ function PeriodSection({
         <FilingBadges planStatus={section.plan} reportStatus={section.report} />
         {!section.editable ? (
           <p className="text-xs text-muted-foreground">
-            Outside the edit window — view only.
+            {dict.home.outsideEditWindow}
           </p>
         ) : null}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
         <div className="grid flex-1 gap-4">
           <div className="space-y-1 text-sm">
-            <p className="font-medium">Plan</p>
+            <p className="font-medium">{dict.common.plan}</p>
             {section.plan ? (
               <>
                 <p className="text-muted-foreground">
-                  {section.plan.completedCount}/{section.plan.itemCount} items
-                  completed
+                  {formatMessage(dict.home.itemsCompleted, {
+                    completed: section.plan.completedCount,
+                    total: section.plan.itemCount,
+                  })}
                 </p>
-                {section.plan.itemTitles.length > 0 ? (
+                {section.plan.itemPreviews.length > 0 ? (
                   <ul className="list-inside list-disc text-muted-foreground">
-                    {section.plan.itemTitles.map((title) => (
-                      <li key={title} className="truncate">
-                        {title}
+                    {section.plan.itemPreviews.map((item) => (
+                      <li key={item.id} className="truncate">
+                        {item.title}
                       </li>
                     ))}
-                    {section.plan.itemCount > section.plan.itemTitles.length ? (
+                    {section.plan.itemCount > section.plan.itemPreviews.length ? (
                       <li>…</li>
                     ) : null}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground">No items yet.</p>
+                  <p className="text-muted-foreground">{dict.home.noItemsYet}</p>
                 )}
               </>
             ) : (
-              <p className="text-muted-foreground">No plan filed.</p>
+              <p className="text-muted-foreground">{dict.home.noPlanFiled}</p>
             )}
           </div>
           <div className="space-y-1 text-sm">
-            <p className="font-medium">Report</p>
+            <p className="font-medium">{dict.common.report}</p>
             {section.report ? (
               <>
                 <p className="text-muted-foreground">
-                  {section.report.entryCount} entr
-                  {section.report.entryCount === 1 ? "y" : "ies"} ·{" "}
-                  {section.report.totalHours.toFixed(1)} h
+                  {section.report.entryCount === 1
+                    ? formatMessage(dict.home.entryCountOne, {
+                        count: section.report.entryCount,
+                      })
+                    : formatMessage(dict.home.entryCountMany, {
+                        count: section.report.entryCount,
+                      })}{" "}
+                  ·{" "}
+                  {formatMessage(dict.home.hoursShort, {
+                    hours: section.report.totalHours.toFixed(1),
+                  })}
                 </p>
-                {section.report.entryTitles.length > 0 ? (
+                {section.report.entryPreviews.length > 0 ? (
                   <ul className="list-inside list-disc text-muted-foreground">
-                    {section.report.entryTitles.map((title) => (
-                      <li key={title} className="truncate">
-                        {title}
+                    {section.report.entryPreviews.map((entry) => (
+                      <li key={entry.id} className="truncate">
+                        {entry.title}
                       </li>
                     ))}
                     {section.report.entryCount >
-                    section.report.entryTitles.length ? (
+                    section.report.entryPreviews.length ? (
                       <li>…</li>
                     ) : null}
                   </ul>
                 ) : null}
               </>
             ) : (
-              <p className="text-muted-foreground">No report filed.</p>
+              <p className="text-muted-foreground">{dict.home.noReportFiled}</p>
             )}
           </div>
         </div>
@@ -277,12 +295,13 @@ function PeriodSection({
 }
 
 function MonthPicker({ value }: { value: string }) {
+  const dict = useDictionary();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor="home-month">Month</Label>
+      <Label htmlFor="home-month">{dict.periods.picker.month}</Label>
       <Input
         id="home-month"
         type="month"
@@ -302,12 +321,13 @@ function MonthPicker({ value }: { value: string }) {
 }
 
 function DayPicker({ value }: { value: string }) {
+  const dict = useDictionary();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor="home-day">Day</Label>
+      <Label htmlFor="home-day">{dict.periods.picker.day}</Label>
       <Input
         id="home-day"
         type="date"

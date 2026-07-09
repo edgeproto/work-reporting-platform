@@ -30,7 +30,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { formatPeriodLabel, periodTypeLabel } from "@/lib/periods";
+import { useDictionary, useI18n } from "@/components/i18n-provider";
+import { formatMessage } from "@/lib/i18n/format";
+import { periodTypeLabel } from "@/lib/i18n/period-labels";
+import { formatPeriodLabel } from "@/lib/periods";
 
 export type SerializedPlanAttachment = {
   id: string;
@@ -75,6 +78,8 @@ function formatFileSize(bytes: number): string {
 
 export function PlanEditor({ plan }: PlanEditorProps) {
   const router = useRouter();
+  const { locale } = useI18n();
+  const dict = useDictionary();
   const isDraft = plan.status === SubmissionStatus.DRAFT;
   const isSubmitted = plan.status === SubmissionStatus.SUBMITTED;
   const canAddItems = isDraft && plan.periodEditable;
@@ -84,6 +89,9 @@ export function PlanEditor({ plan }: PlanEditorProps) {
     plan.type,
     new Date(plan.periodStart),
     new Date(plan.periodEnd),
+    undefined,
+    locale,
+    dict.periods,
   );
 
   return (
@@ -91,7 +99,9 @@ export function PlanEditor({ plan }: PlanEditorProps) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {periodTypeLabel(plan.type)} Plan
+            {formatMessage(dict.plans.title, {
+              type: periodTypeLabel(plan.type, dict),
+            })}
           </h1>
           <p className="text-muted-foreground">{periodLabel}</p>
         </div>
@@ -155,11 +165,13 @@ function PlanItemAttachments({
   itemId,
   attachments,
   readOnly,
+  compact = false,
 }: {
   planId: string;
   itemId: string;
   attachments: SerializedPlanAttachment[];
   readOnly: boolean;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -201,6 +213,30 @@ function PlanItemAttachments({
       router.refresh();
     });
   };
+
+  if (compact) {
+    if (attachments.length === 0) {
+      return null;
+    }
+
+    return (
+      <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+        <Paperclip className="size-3.5 shrink-0" aria-hidden />
+        {attachments.map((attachment, index) => (
+          <span key={attachment.id} className="inline-flex items-center gap-1.5">
+            {index > 0 ? <span aria-hidden>,</span> : null}
+            <a
+              href={`/api/attachments/${attachment.id}`}
+              className="hover:underline"
+              download={attachment.fileName}
+            >
+              {attachment.fileName}
+            </a>
+          </span>
+        ))}
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -439,7 +475,8 @@ function PlanItemRow({
         planId={planId}
         itemId={item.id}
         attachments={item.attachments}
-        readOnly={!canEdit}
+        readOnly
+        compact
       />
     </li>
   );

@@ -13,7 +13,7 @@ import {
   itemHasMoreLines,
   useExpandableItems,
 } from "@/components/feed/expandable-lines";
-import { Button } from "@/components/ui/button";
+import { useDictionary } from "@/components/i18n-provider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WeekPicker } from "@/components/plans/week-picker";
@@ -27,12 +27,11 @@ import { formatDashboardTimestamp } from "@/lib/dashboard/period";
 import type {
   FilingTimestamps,
   MemberRosterRow,
-  RosterPlanLine,
-  RosterReportLine,
 } from "@/lib/dashboard/types";
+import { formatMessage } from "@/lib/i18n/format";
+import { periodPickerLabel, periodTypeLabel } from "@/lib/i18n/period-labels";
 import {
   monthInputToReferenceDate,
-  periodTypeLabel,
   pickerValueFromReferenceDate,
 } from "@/lib/periods";
 
@@ -102,6 +101,8 @@ function FilingTimestampFooter({
   timestamps: FilingTimestamps | null;
   show: boolean;
 }) {
+  const dict = useDictionary();
+
   if (!show || !timestamps) {
     return null;
   }
@@ -118,13 +119,22 @@ function FilingTimestampFooter({
 
   return (
     <div className="mt-2 space-y-0.5 border-t pt-2 text-xs text-muted-foreground">
-      {submitted ? <p>Submitted {submitted}</p> : null}
-      {changedAfterSubmit ? <p>Last changed {updated}</p> : null}
+      {submitted ? (
+        <p>
+          {formatMessage(dict.dashboard.submittedAt, { timestamp: submitted })}
+        </p>
+      ) : null}
+      {changedAfterSubmit ? (
+        <p>
+          {formatMessage(dict.dashboard.lastChangedAt, { timestamp: updated })}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 export function DashboardFiltersForm({ filters }: { filters: DashboardFilters }) {
+  const dict = useDictionary();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [periodType, setPeriodType] = useState(filters.periodType);
@@ -154,7 +164,7 @@ export function DashboardFiltersForm({ filters }: { filters: DashboardFilters })
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="space-y-1.5">
-        <Label htmlFor="dash-type">Type</Label>
+        <Label htmlFor="dash-type">{dict.dashboard.filtersType}</Label>
         <select
           id="dash-type"
           value={periodType}
@@ -164,7 +174,7 @@ export function DashboardFiltersForm({ filters }: { filters: DashboardFilters })
         >
           {Object.values(PeriodType).map((type) => (
             <option key={type} value={type}>
-              {periodTypeLabel(type)}
+              {periodTypeLabel(type, dict)}
             </option>
           ))}
         </select>
@@ -183,7 +193,7 @@ export function DashboardFiltersForm({ filters }: { filters: DashboardFilters })
       ) : (
         <div className="space-y-1.5">
           <Label htmlFor="dash-period">
-            {periodType === PeriodType.MONTHLY ? "Month" : "Date"}
+            {periodPickerLabel(periodType, dict)}
           </Label>
           <Input
             id="dash-period"
@@ -214,6 +224,7 @@ export function MemberRosterTable({
   roleLabels,
   showChangeTimestamps,
 }: MemberRosterProps) {
+  const dict = useDictionary();
   const qs = buildParams(filters);
   const rowIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const { expandAll, isExpanded, toggleItem, toggleExpandAll } =
@@ -240,22 +251,34 @@ export function MemberRosterTable({
         <table className="w-full min-w-[48rem] text-left text-sm">
           <thead className="border-b bg-muted/40 text-muted-foreground">
             <tr>
-              <th className="w-8 px-2 py-3" aria-label="Expand row" />
-              <th className="px-4 py-3 font-medium">
-                <SortHeader label="Name" sortKey="name" filters={filters} />
-              </th>
-              <th className="px-4 py-3 font-medium">Role</th>
-              <th className="min-w-48 px-4 py-3 font-medium">Plan</th>
-              <th className="min-w-48 px-4 py-3 font-medium">Report</th>
+              <th className="w-8 px-2 py-3" aria-label={dict.common.expandAll} />
               <th className="px-4 py-3 font-medium">
                 <SortHeader
-                  label="Plan complete %"
+                  label={dict.dashboard.tableName}
+                  sortKey="name"
+                  filters={filters}
+                />
+              </th>
+              <th className="px-4 py-3 font-medium">{dict.dashboard.tableRole}</th>
+              <th className="min-w-48 px-4 py-3 font-medium">
+                {dict.dashboard.tablePlan}
+              </th>
+              <th className="min-w-48 px-4 py-3 font-medium">
+                {dict.dashboard.tableReport}
+              </th>
+              <th className="px-4 py-3 font-medium">
+                <SortHeader
+                  label={dict.dashboard.tablePlanComplete}
                   sortKey="completion"
                   filters={filters}
                 />
               </th>
               <th className="px-4 py-3 font-medium">
-                <SortHeader label="Hours" sortKey="hours" filters={filters} />
+                <SortHeader
+                  label={dict.dashboard.tableHours}
+                  sortKey="hours"
+                  filters={filters}
+                />
               </th>
             </tr>
           </thead>
@@ -266,7 +289,7 @@ export function MemberRosterTable({
                   colSpan={7}
                   className="px-4 py-8 text-center text-muted-foreground"
                 >
-                  No active members in this organization.
+                  {dict.dashboard.noMembers}
                 </td>
               </tr>
             ) : (
@@ -303,7 +326,7 @@ export function MemberRosterTable({
                       <ExpandableLineList
                         lines={row.planLines}
                         expanded={expanded}
-                        emptyLabel="No plan filed."
+                        emptyLabel={dict.dashboard.noPlanFiled}
                         lineKey={(line, index) => `${line.title}-${index}`}
                         renderLine={(line) => (
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -324,7 +347,7 @@ export function MemberRosterTable({
                       <ExpandableLineList
                         lines={row.reportLines}
                         expanded={expanded}
-                        emptyLabel="No report filed."
+                        emptyLabel={dict.dashboard.noReportFiled}
                         lineKey={(line, index) => `${line.title}-${index}`}
                         renderLine={(line) => (
                           <div className="flex flex-wrap items-center gap-1.5">

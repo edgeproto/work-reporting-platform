@@ -8,6 +8,8 @@ import {
   getPeriodBounds,
   monthInputToReferenceDate,
 } from "@/lib/periods";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import type { Locale } from "@/lib/i18n/locales";
 import { db } from "@/lib/db";
 import type { HomePeriodPrefs } from "@/lib/home/prefs";
 
@@ -25,14 +27,14 @@ export type HomePeriodSectionData = {
     status: FilingStatus;
     itemCount: number;
     completedCount: number;
-    itemTitles: string[];
+    itemPreviews: Array<{ id: string; title: string }>;
   } | null;
   report: {
     id: string;
     status: FilingStatus;
     entryCount: number;
     totalHours: number;
-    entryTitles: string[];
+    entryPreviews: Array<{ id: string; title: string }>;
   } | null;
 };
 
@@ -61,7 +63,9 @@ async function loadSection(
   organizationId: string,
   type: PeriodType,
   referenceDate: string,
+  locale: Locale,
 ): Promise<HomePeriodSectionData> {
+  const dict = getDictionary(locale);
   const { periodStart, periodEnd } = getPeriodBounds(type, referenceDate);
   const editable = canEditPeriod(type, periodStart, periodEnd);
 
@@ -97,7 +101,14 @@ async function loadSection(
     referenceDate,
     periodStart: periodStart.toISOString(),
     periodEnd: periodEnd.toISOString(),
-    periodLabel: formatPeriodLabel(type, periodStart, periodEnd),
+    periodLabel: formatPeriodLabel(
+      type,
+      periodStart,
+      periodEnd,
+      undefined,
+      locale,
+      dict.periods,
+    ),
     editable,
     plan: plan
       ? {
@@ -107,7 +118,10 @@ async function loadSection(
           completedCount: plan.items.filter(
             (item) => item.outcome === PlanItemOutcome.COMPLETED,
           ).length,
-          itemTitles: plan.items.slice(0, 3).map((item) => getPlanItemTitle(item)),
+          itemPreviews: plan.items.slice(0, 3).map((item) => ({
+            id: item.id,
+            title: getPlanItemTitle(item),
+          })),
         }
       : null,
     report: report
@@ -119,9 +133,10 @@ async function loadSection(
             (sum, entry) => sum + (Number(entry.hours) || 0),
             0,
           ),
-          entryTitles: report.entries
-            .slice(0, 3)
-            .map((entry) => getReportEntryTitle(entry)),
+          entryPreviews: report.entries.slice(0, 3).map((entry) => ({
+            id: entry.id,
+            title: getReportEntryTitle(entry),
+          })),
         }
       : null,
   };
@@ -131,6 +146,7 @@ export async function loadHomeHubData(
   userId: string,
   organizationId: string,
   prefs: HomePeriodPrefs,
+  locale: Locale = "en",
 ): Promise<{
   monthly: HomePeriodSectionData;
   weekly: HomePeriodSectionData;
@@ -142,18 +158,21 @@ export async function loadHomeHubData(
       organizationId,
       PeriodType.MONTHLY,
       referenceForType(PeriodType.MONTHLY, prefs),
+      locale,
     ),
     loadSection(
       userId,
       organizationId,
       PeriodType.WEEKLY,
       referenceForType(PeriodType.WEEKLY, prefs),
+      locale,
     ),
     loadSection(
       userId,
       organizationId,
       PeriodType.DAILY,
       referenceForType(PeriodType.DAILY, prefs),
+      locale,
     ),
   ]);
 

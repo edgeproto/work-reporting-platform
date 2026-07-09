@@ -10,6 +10,7 @@ import {
 import { fetchMemberRoster } from "@/lib/dashboard/queries";
 import { isManagerOrAbove } from "@/lib/rbac";
 import { formatPeriodLabel } from "@/lib/periods";
+import { formatMessage } from "@/lib/i18n/format";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { getLocale } from "@/lib/i18n/get-locale";
 
@@ -35,6 +36,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     filters.periodType,
     filters.periodStart,
     filters.periodEnd,
+    undefined,
+    locale,
+    dict.periods,
   );
 
   return (
@@ -44,17 +48,17 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           {dict.nav.teamFeed}
         </h1>
         <p className="text-muted-foreground">
-          Team roster for {periodLabel}.
+          {formatMessage(dict.dashboard.subtitle, { period: periodLabel })}
         </p>
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Period</h2>
+        <h2 className="text-lg font-medium">{dict.dashboard.period}</h2>
         <DashboardFiltersForm filters={filters} />
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Members</h2>
+        <h2 className="text-lg font-medium">{dict.dashboard.members}</h2>
         <MemberRosterTable
           rows={rows}
           filters={filters}
