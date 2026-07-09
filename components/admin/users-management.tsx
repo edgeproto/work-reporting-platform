@@ -13,6 +13,7 @@ import {
   type AdminActionResult,
 } from "@/app/(dashboard)/admin/users/actions";
 import { useDictionary } from "@/components/i18n-provider";
+import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,7 @@ export type SerializedAdminUser = {
   role: Role;
   isActive: boolean;
   hasPassword: boolean;
+  hasAvatar: boolean;
   passwordSetLink: string | null;
   tokenExpiresAt: string | null;
   createdAt: string;
@@ -251,9 +253,16 @@ function UserRow({
       data-testid={`user-row-${user.email}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{user.name}</span>
+        <div className="flex min-w-0 items-start gap-3">
+          <UserAvatar
+            userId={user.id}
+            name={user.name}
+            hasAvatar={user.hasAvatar}
+            size="md"
+          />
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">{user.name}</span>
             <Badge variant="outline">{dict.roles[user.role]}</Badge>
             {!user.isActive ? (
               <Badge variant="secondary">{dict.admin.inactive}</Badge>
@@ -264,8 +273,9 @@ function UserRow({
               <Badge variant="outline">{dict.admin.awaitingPassword}</Badge>
             )}
             {isSelf ? <Badge>{dict.admin.you}</Badge> : null}
+            </div>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
-          <p className="text-sm text-muted-foreground">{user.email}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

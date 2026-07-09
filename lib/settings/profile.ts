@@ -1,4 +1,9 @@
 import { db } from "@/lib/db";
+import {
+  AVATAR_FILE_NAME,
+  AVATAR_MIME_TYPE,
+  compressAvatar,
+} from "@/lib/images/compress-avatar";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import {
   buildAvatarStorageKey,
@@ -141,15 +146,20 @@ export async function updateUserAvatar(
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const storageKey = buildAvatarStorageKey(organizationId, userId, file.name);
-  await saveFile(storageKey, buffer);
+  const compressed = await compressAvatar(buffer);
+  const storageKey = buildAvatarStorageKey(
+    organizationId,
+    userId,
+    AVATAR_FILE_NAME,
+  );
+  await saveFile(storageKey, compressed);
 
   try {
     await db.user.update({
       where: { id: userId },
       data: {
         avatarKey: storageKey,
-        avatarMimeType: file.type || "application/octet-stream",
+        avatarMimeType: AVATAR_MIME_TYPE,
       },
     });
   } catch (error) {

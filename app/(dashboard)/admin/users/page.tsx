@@ -30,6 +30,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     role: user.role,
     isActive: user.isActive,
     hasPassword: user.hasPassword,
+    hasAvatar: user.hasAvatar,
     passwordSetLink: user.passwordSetLink,
     tokenExpiresAt: user.tokenExpiresAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),

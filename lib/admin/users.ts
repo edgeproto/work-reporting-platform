@@ -12,6 +12,7 @@ export type AdminUserRow = {
   role: Role;
   isActive: boolean;
   hasPassword: boolean;
+  hasAvatar: boolean;
   passwordSetLink: string | null;
   tokenExpiresAt: Date | null;
   createdAt: Date;
@@ -30,6 +31,7 @@ export async function listOrganizationUsers(
       role: true,
       isActive: true,
       passwordHash: true,
+      avatarKey: true,
       createdAt: true,
       passwordSetTokens: {
         where: {
@@ -52,6 +54,7 @@ export async function listOrganizationUsers(
       role: user.role,
       isActive: user.isActive,
       hasPassword: !!user.passwordHash,
+      hasAvatar: !!user.avatarKey,
       passwordSetLink: activeToken
         ? getPasswordSetLink(activeToken.token)
         : null,

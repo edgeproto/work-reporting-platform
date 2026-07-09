@@ -6,6 +6,7 @@ import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { DashboardNav, type DashboardNavLink } from "@/components/dashboard-nav";
 import { useDictionary } from "@/components/i18n-provider";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -127,18 +128,12 @@ export function DashboardShell({
           {!collapsed ? (
             <>
               <div className="flex items-center gap-3 text-sm">
-                {hasAvatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={`/api/avatars/${userId}`}
-                    alt=""
-                    className="size-9 shrink-0 rounded-full border object-cover"
-                  />
-                ) : (
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-muted text-xs font-medium">
-                    {userName.slice(0, 1).toUpperCase() || "?"}
-                  </div>
-                )}
+                <UserAvatar
+                  userId={userId}
+                  name={userName}
+                  hasAvatar={hasAvatar}
+                  size="md"
+                />
                 <div className="min-w-0">
                   <p className="truncate font-medium">{userName}</p>
                   <p className="text-xs text-muted-foreground">{roleLabel}</p>
@@ -157,22 +152,13 @@ export function DashboardShell({
             </>
           ) : (
             <div className="flex flex-col items-center gap-2">
-              {hasAvatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`/api/avatars/${userId}`}
-                  alt=""
-                  className="size-8 rounded-full border object-cover"
-                  title={userName}
-                />
-              ) : (
-                <div
-                  className="flex size-8 items-center justify-center rounded-full border bg-muted text-xs font-medium"
-                  title={`${userName} · ${roleLabel}`}
-                >
-                  {userName.slice(0, 1).toUpperCase() || "?"}
-                </div>
-              )}
+              <UserAvatar
+                userId={userId}
+                name={userName}
+                hasAvatar={hasAvatar}
+                size="sm"
+                title={`${userName} · ${roleLabel}`}
+              />
               <form action={signOutAction}>
                 <Button
                   type="submit"

@@ -12,6 +12,7 @@ import {
 } from "@/app/(dashboard)/settings/actions";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useDictionary } from "@/components/i18n-provider";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -44,7 +45,7 @@ export function SettingsProfileForms({
 }: ProfileFormProps) {
   return (
     <div className="space-y-6">
-      <AvatarCard userId={user.id} hasAvatar={user.hasAvatar} />
+      <AvatarCard userId={user.id} hasAvatar={user.hasAvatar} userName={user.name} />
       <ProfileCard
         name={user.name}
         email={user.email}
@@ -85,9 +86,11 @@ function LanguageCard({
 function AvatarCard({
   userId,
   hasAvatar,
+  userName,
 }: {
   userId: string;
   hasAvatar: boolean;
+  userName: string;
 }) {
   const dict = useDictionary();
   const router = useRouter();
@@ -123,18 +126,13 @@ function AvatarCard({
         <CardDescription>{dict.settings.avatarDescription}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-4">
-        <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border bg-muted text-lg font-medium">
-          {hasAvatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`/api/avatars/${userId}?v=${Date.now()}`}
-              alt={dict.settings.avatarAlt}
-              className="size-full object-cover"
-            />
-          ) : (
-            <span>?</span>
-          )}
-        </div>
+        <UserAvatar
+          userId={userId}
+          name={userName}
+          hasAvatar={hasAvatar}
+          size="lg"
+          cacheBust
+        />
         <form
           action={formAction}
           onSubmit={handleSubmit}

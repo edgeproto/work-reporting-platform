@@ -37,8 +37,8 @@ export async function GET(_request: Request, context: RouteContext) {
     return new NextResponse(new Uint8Array(data), {
       status: 200,
       headers: {
-        "Content-Type": user.avatarMimeType || "application/octet-stream",
-        "Cache-Control": "private, max-age=3600",
+        "Content-Type": user.avatarMimeType || "image/webp",
+        "Cache-Control": "private, max-age=86400, immutable",
       },
     });
   } catch {
