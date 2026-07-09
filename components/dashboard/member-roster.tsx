@@ -4,8 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-import { PeriodType, PlanItemOutcome } from "@/app/generated/prisma/enums";
-import { VisibilityBadge, PlanItemOutcomeBadge } from "@/components/plans/plan-badges";
+import { PeriodType, PlanItemOutcome, SubmissionStatus } from "@/app/generated/prisma/enums";
+import {
+  FilingMissingBadge,
+  PlanItemOutcomeBadge,
+  PlanStatusBadge,
+  VisibilityBadge,
+} from "@/components/plans/plan-badges";
+import { ReportStatusBadge } from "@/components/reports/report-badges";
 import {
   ExpandableLineList,
   ExpandAllToggleButton,
@@ -28,6 +34,7 @@ import type {
   FilingTimestamps,
   MemberRosterRow,
 } from "@/lib/dashboard/types";
+import { filingStatusFromTimestamps } from "@/lib/filing/status";
 import { formatMessage } from "@/lib/i18n/format";
 import { periodPickerLabel, periodTypeLabel } from "@/lib/i18n/period-labels";
 import {
@@ -91,6 +98,28 @@ function SortHeader({
         </span>
       ) : null}
     </Link>
+  );
+}
+
+function RosterFilingBadge({
+  timestamps,
+  kind,
+}: {
+  timestamps: FilingTimestamps | null;
+  kind: "plan" | "report";
+}) {
+  const status = filingStatusFromTimestamps(timestamps);
+  if (status === "missing") {
+    return <FilingMissingBadge />;
+  }
+  const submissionStatus =
+    status === "submitted"
+      ? SubmissionStatus.SUBMITTED
+      : SubmissionStatus.DRAFT;
+  return kind === "plan" ? (
+    <PlanStatusBadge status={submissionStatus} />
+  ) : (
+    <ReportStatusBadge status={submissionStatus} />
   );
 }
 
@@ -323,6 +352,12 @@ export function MemberRosterTable({
                       {roleLabels[row.role] ?? row.role}
                     </td>
                     <td className="px-4 py-3">
+                      <div className="mb-2">
+                        <RosterFilingBadge
+                          timestamps={row.planTimestamps}
+                          kind="plan"
+                        />
+                      </div>
                       <ExpandableLineList
                         lines={row.planLines}
                         expanded={expanded}
@@ -344,6 +379,12 @@ export function MemberRosterTable({
                       />
                     </td>
                     <td className="px-4 py-3">
+                      <div className="mb-2">
+                        <RosterFilingBadge
+                          timestamps={row.reportTimestamps}
+                          kind="report"
+                        />
+                      </div>
                       <ExpandableLineList
                         lines={row.reportLines}
                         expanded={expanded}
@@ -353,7 +394,9 @@ export function MemberRosterTable({
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="truncate">{line.title}</span>
                             <span className="text-xs text-muted-foreground">
-                              {line.hours.toFixed(1)} h
+                              {formatMessage(dict.feed.hoursShort, {
+                                hours: line.hours.toFixed(1),
+                              })}
                             </span>
                             <VisibilityBadge visibility={line.visibility} />
                           </div>

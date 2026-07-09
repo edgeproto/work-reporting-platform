@@ -104,6 +104,12 @@ export const ko: Dictionary = {
     viewPlan: "계획 보기",
     submitReport: "보고 제출",
     viewReport: "보고 보기",
+    filePlan: "계획 작성",
+    fileReport: "보고 작성",
+    continueDraftPlan: "계획 초안 계속하기",
+    continueDraftReport: "보고 초안 계속하기",
+    openingPlan: "계획 여는 중…",
+    openingReport: "보고 여는 중…",
   },
   settings: {
     subtitle: "프로필, 비밀번호, 아바타, 언어를 관리합니다.",

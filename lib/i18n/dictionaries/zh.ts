@@ -104,6 +104,12 @@ export const zh: Dictionary = {
     viewPlan: "查看计划",
     submitReport: "提交报告",
     viewReport: "查看报告",
+    filePlan: "填写计划",
+    fileReport: "填写报告",
+    continueDraftPlan: "继续计划草稿",
+    continueDraftReport: "继续报告草稿",
+    openingPlan: "正在打开计划…",
+    openingReport: "正在打开报告…",
   },
   settings: {
     subtitle: "管理个人资料、密码、头像和语言。",

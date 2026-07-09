@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 
-import { PlanItemOutcome, SubmissionStatus } from "@/app/generated/prisma/enums";
+import { PlanItemOutcome } from "@/app/generated/prisma/enums";
 import {
   ExpandableLineList,
   ExpandAllToggleButton,
@@ -11,10 +11,9 @@ import {
   itemHasMoreLines,
   useExpandableItems,
 } from "@/components/feed/expandable-lines";
+import { FilingStatusStrip } from "@/components/filing/filing-status-strip";
 import { useDictionary } from "@/components/i18n-provider";
-import { PlanItemOutcomeBadge, PlanStatusBadge, VisibilityBadge } from "@/components/plans/plan-badges";
-import { ReportStatusBadge } from "@/components/reports/report-badges";
-import { Badge } from "@/components/ui/badge";
+import { PlanItemOutcomeBadge, VisibilityBadge } from "@/components/plans/plan-badges";
 import {
   Card,
   CardContent,
@@ -22,13 +21,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { feedCardAccentClass } from "@/lib/filing/status";
 import { formatMessage } from "@/lib/i18n/format";
 import type { FeedPeriodCard, MyFeedData } from "@/lib/my-feed/types";
-
-function MissingBadge() {
-  const dict = useDictionary();
-  return <Badge variant="outline">{dict.badges.missing}</Badge>;
-}
+import { cn } from "@/lib/utils";
 
 function feedCardId(card: FeedPeriodCard): string {
   return `${card.type}-${card.referenceDate}`;
@@ -49,11 +45,14 @@ function FeedCard({
   const canExpand = itemHasMoreLines(planLineCount, reportLineCount);
 
   return (
-    <Card>
+    <Card className={cn(feedCardAccentClass(card.plan, card.report))}>
       <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-        <div className="min-w-0 space-y-1">
-          <CardTitle className="text-base">{card.heading}</CardTitle>
-          <CardDescription className="text-xs">{card.periodLabel}</CardDescription>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="space-y-1">
+            <CardTitle className="text-base">{card.heading}</CardTitle>
+            <CardDescription className="text-xs">{card.periodLabel}</CardDescription>
+          </div>
+          <FilingStatusStrip plan={card.plan} report={card.report} />
         </div>
         {canExpand ? (
           <ExpandMoreButton
@@ -65,34 +64,19 @@ function FeedCard({
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {dict.common.plan}
-            </p>
-            {card.plan ? (
-              <>
-                <PlanStatusBadge
-                  status={
-                    card.plan.status === "submitted"
-                      ? SubmissionStatus.SUBMITTED
-                      : SubmissionStatus.DRAFT
-                  }
-                />
-                {card.plan.lines.length > 0 ? (
-                  <span className="text-xs text-muted-foreground">
-                    {formatMessage(dict.feed.completed, {
-                      completed: card.plan.completedCount,
-                      total: card.plan.lines.length,
-                    })}
-                  </span>
-                ) : null}
-              </>
-            ) : (
-              <MissingBadge />
-            )}
-          </div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {dict.common.plan}
+          </p>
           {card.plan ? (
             <div className="space-y-2">
+              {card.plan.lines.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {formatMessage(dict.feed.completed, {
+                    completed: card.plan.completedCount,
+                    total: card.plan.lines.length,
+                  })}
+                </p>
+              ) : null}
               <ExpandableLineList
                 lines={card.plan.lines}
                 expanded={expanded}
@@ -119,33 +103,18 @@ function FeedCard({
         </div>
 
         <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {dict.common.report}
-            </p>
-            {card.report ? (
-              <>
-                <ReportStatusBadge
-                  status={
-                    card.report.status === "submitted"
-                      ? SubmissionStatus.SUBMITTED
-                      : SubmissionStatus.DRAFT
-                  }
-                />
-                {card.report.lines.length > 0 ? (
-                  <span className="text-xs text-muted-foreground">
-                    {formatMessage(dict.feed.hoursShort, {
-                      hours: card.report.totalHours.toFixed(1),
-                    })}
-                  </span>
-                ) : null}
-              </>
-            ) : (
-              <MissingBadge />
-            )}
-          </div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {dict.common.report}
+          </p>
           {card.report ? (
             <div className="space-y-2">
+              {card.report.lines.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {formatMessage(dict.feed.hoursShort, {
+                    hours: card.report.totalHours.toFixed(1),
+                  })}
+                </p>
+              ) : null}
               <ExpandableLineList
                 lines={card.report.lines}
                 expanded={expanded}

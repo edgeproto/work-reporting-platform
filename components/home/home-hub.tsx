@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { ClipboardList, ScrollText } from "lucide-react";
 
-import { SubmissionStatus } from "@/app/generated/prisma/enums";
 import {
   openOrCreatePlanAction,
   openOrCreateReportAction,
@@ -11,11 +11,9 @@ import {
   setHomeMonthAction,
   setHomeWeekAction,
 } from "@/app/(dashboard)/home-actions";
+import { FilingStatusStrip } from "@/components/filing/filing-status-strip";
 import { useDictionary } from "@/components/i18n-provider";
 import { WeekPicker } from "@/components/plans/week-picker";
-import { PlanStatusBadge } from "@/components/plans/plan-badges";
-import { ReportStatusBadge } from "@/components/reports/report-badges";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,9 +24,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { Dictionary } from "@/lib/i18n/dictionaries/en";
 import type { HomePeriodSectionData } from "@/lib/home/queries";
+import { periodFilingAccentClass } from "@/lib/filing/status";
 import { formatMessage } from "@/lib/i18n/format";
 import { periodTypeLabel } from "@/lib/i18n/period-labels";
+import { cn } from "@/lib/utils";
 
 type HomeHubProps = {
   monthly: HomePeriodSectionData;
@@ -41,52 +42,43 @@ type HomeHubProps = {
   };
 };
 
-function MissingBadge() {
-  const dict = useDictionary();
-  return <Badge variant="outline">{dict.badges.missing}</Badge>;
+type PendingAction = "plan" | "report" | null;
+
+type ActionButtonMeta = {
+  label: string;
+  variant: "default" | "secondary" | "outline";
+};
+
+function planButtonMeta(
+  section: HomePeriodSectionData,
+  dict: Dictionary,
+): ActionButtonMeta {
+  const planMissing = !section.plan;
+  const planDraft = section.plan?.status === "draft";
+
+  if (planMissing && section.editable) {
+    return { label: dict.home.filePlan, variant: "default" };
+  }
+  if (planDraft && section.editable) {
+    return { label: dict.home.continueDraftPlan, variant: "secondary" };
+  }
+  return { label: dict.home.viewPlan, variant: "outline" };
 }
 
-function FilingBadges({
-  planStatus,
-  reportStatus,
-}: {
-  planStatus: HomePeriodSectionData["plan"];
-  reportStatus: HomePeriodSectionData["report"];
-}) {
-  const dict = useDictionary();
+function reportButtonMeta(
+  section: HomePeriodSectionData,
+  dict: Dictionary,
+): ActionButtonMeta {
+  const reportMissing = !section.report;
+  const reportDraft = section.report?.status === "draft";
 
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        {dict.common.plan}
-        {planStatus ? (
-          <PlanStatusBadge
-            status={
-              planStatus.status === "submitted"
-                ? SubmissionStatus.SUBMITTED
-                : SubmissionStatus.DRAFT
-            }
-          />
-        ) : (
-          <MissingBadge />
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        {dict.common.report}
-        {reportStatus ? (
-          <ReportStatusBadge
-            status={
-              reportStatus.status === "submitted"
-                ? SubmissionStatus.SUBMITTED
-                : SubmissionStatus.DRAFT
-            }
-          />
-        ) : (
-          <MissingBadge />
-        )}
-      </div>
-    </div>
-  );
+  if (reportMissing && section.editable) {
+    return { label: dict.home.fileReport, variant: "default" };
+  }
+  if (reportDraft && section.editable) {
+    return { label: dict.home.continueDraftReport, variant: "secondary" };
+  }
+  return { label: dict.home.viewReport, variant: "outline" };
 }
 
 function PeriodSection({
@@ -100,6 +92,13 @@ function PeriodSection({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+
+  useEffect(() => {
+    if (!isPending) {
+      setPendingAction(null);
+    }
+  }, [isPending]);
 
   const planMissing = !section.plan;
   const planDraft = section.plan?.status === "draft";
@@ -118,6 +117,7 @@ function PeriodSection({
 
   const openPlan = () => {
     setError(null);
+    setPendingAction("plan");
     startTransition(async () => {
       if (section.plan && !section.editable) {
         router.push(`/my-plans/${section.plan.id}`);
@@ -143,6 +143,7 @@ function PeriodSection({
 
   const openReport = () => {
     setError(null);
+    setPendingAction("report");
     startTransition(async () => {
       if (section.report && !section.editable) {
         router.push(`/my-reports/${section.report.id}`);
@@ -162,13 +163,8 @@ function PeriodSection({
     });
   };
 
-  const planButtonLabel =
-    planMissing && section.editable ? dict.home.submitPlan : dict.home.viewPlan;
-
-  const reportButtonLabel =
-    reportMissing && section.editable
-      ? dict.home.submitReport
-      : dict.home.viewReport;
+  const planMeta = planButtonMeta(section, dict);
+  const reportMeta = reportButtonMeta(section, dict);
 
   const showPlanAction = canSubmitOrEditPlan || canViewPlan;
   const showReportAction =
@@ -177,7 +173,10 @@ function PeriodSection({
   return (
     <Card
       data-testid={`home-section-${section.type.toLowerCase()}`}
-      className="flex h-full min-w-0 flex-col"
+      className={cn(
+        "flex h-full min-w-0 flex-col",
+        periodFilingAccentClass(section.plan, section.report, section.editable),
+      )}
     >
       <CardHeader className="space-y-3">
         <div className="space-y-1">
@@ -186,8 +185,8 @@ function PeriodSection({
             {section.periodLabel}
           </CardDescription>
         </div>
+        <FilingStatusStrip plan={section.plan} report={section.report} />
         {picker}
-        <FilingBadges planStatus={section.plan} reportStatus={section.report} />
         {!section.editable ? (
           <p className="text-xs text-muted-foreground">
             {dict.home.outsideEditWindow}
@@ -195,8 +194,8 @@ function PeriodSection({
         ) : null}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
-        <div className="grid flex-1 gap-4">
-          <div className="space-y-1 text-sm">
+        <div className="grid flex-1 gap-3">
+          <div className="space-y-2 rounded-lg border bg-background/70 p-3 text-sm">
             <p className="font-medium">{dict.common.plan}</p>
             {section.plan ? (
               <>
@@ -224,8 +223,23 @@ function PeriodSection({
             ) : (
               <p className="text-muted-foreground">{dict.home.noPlanFiled}</p>
             )}
+            {showPlanAction ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={planMeta.variant}
+                disabled={isPending}
+                className="w-full"
+                onClick={openPlan}
+              >
+                <ClipboardList className="size-3.5" aria-hidden />
+                {pendingAction === "plan" && isPending
+                  ? dict.home.openingPlan
+                  : planMeta.label}
+              </Button>
+            ) : null}
           </div>
-          <div className="space-y-1 text-sm">
+          <div className="space-y-2 rounded-lg border bg-background/70 p-3 text-sm">
             <p className="font-medium">{dict.common.report}</p>
             {section.report ? (
               <>
@@ -259,34 +273,22 @@ function PeriodSection({
             ) : (
               <p className="text-muted-foreground">{dict.home.noReportFiled}</p>
             )}
+            {showReportAction ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={reportMeta.variant}
+                disabled={isPending}
+                className="w-full"
+                onClick={openReport}
+              >
+                <ScrollText className="size-3.5" aria-hidden />
+                {pendingAction === "report" && isPending
+                  ? dict.home.openingReport
+                  : reportMeta.label}
+              </Button>
+            ) : null}
           </div>
-        </div>
-
-        <div className="mt-auto flex flex-wrap gap-2">
-          {showPlanAction ? (
-            <Button
-              type="button"
-              size="sm"
-              variant={planSubmitted || !section.editable ? "outline" : "default"}
-              disabled={isPending}
-              onClick={openPlan}
-            >
-              {planButtonLabel}
-            </Button>
-          ) : null}
-          {showReportAction ? (
-            <Button
-              type="button"
-              size="sm"
-              variant={
-                reportSubmitted || !section.editable ? "outline" : "default"
-              }
-              disabled={isPending}
-              onClick={openReport}
-            >
-              {reportButtonLabel}
-            </Button>
-          ) : null}
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </CardContent>

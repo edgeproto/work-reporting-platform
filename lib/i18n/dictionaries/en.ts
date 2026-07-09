@@ -91,6 +91,12 @@ export type Dictionary = {
     viewPlan: string;
     submitReport: string;
     viewReport: string;
+    filePlan: string;
+    fileReport: string;
+    continueDraftPlan: string;
+    continueDraftReport: string;
+    openingPlan: string;
+    openingReport: string;
   };
   settings: {
     subtitle: string;
@@ -479,6 +485,12 @@ export const en: Dictionary = {
     viewPlan: "View plan",
     submitReport: "Submit report",
     viewReport: "View report",
+    filePlan: "File plan",
+    fileReport: "File report",
+    continueDraftPlan: "Continue plan draft",
+    continueDraftReport: "Continue report draft",
+    openingPlan: "Opening plan…",
+    openingReport: "Opening report…",
   },
   settings: {
     subtitle: "Manage your personal profile, password, avatar, and language.",
