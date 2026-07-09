@@ -1,6 +1,9 @@
 import { PeriodType } from "@/app/generated/prisma/enums";
+import { toIntlLocale } from "@/lib/i18n/intl-locale";
+import type { Locale } from "@/lib/i18n/locales";
 import {
   formatDateInTz,
+  getOrgTimezone,
   getPeriodBounds,
   monthInputToReferenceDate,
   pickerValueFromReferenceDate,
@@ -24,11 +27,17 @@ export function defaultReferenceDateForType(
   }
 }
 
-export function formatDashboardTimestamp(date: Date | string): string {
+export function formatDashboardTimestamp(
+  date: Date | string,
+  options: { locale?: Locale; timeZone?: string } = {},
+): string {
   const value = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en-US", {
+  const locale = options.locale ?? "en";
+  const timeZone = options.timeZone ?? getOrgTimezone();
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone,
   }).format(value);
 }
 

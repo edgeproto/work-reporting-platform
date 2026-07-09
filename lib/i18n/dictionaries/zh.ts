@@ -275,6 +275,8 @@ export const zh: Dictionary = {
   },
   navEditor: {
     backToHome: "← 返回首页",
+    editingPlan: "正在编辑计划",
+    editingReport: "正在编辑报告",
   },
   admin: {
     usersTitle: "用户管理",

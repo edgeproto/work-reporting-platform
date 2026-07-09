@@ -275,6 +275,8 @@ export const ko: Dictionary = {
   },
   navEditor: {
     backToHome: "← 홈으로 돌아가기",
+    editingPlan: "계획 편집 중",
+    editingReport: "보고 편집 중",
   },
   admin: {
     usersTitle: "사용자 관리",

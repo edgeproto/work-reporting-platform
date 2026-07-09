@@ -1,19 +1,21 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
-
+import { FilingPeriodShell } from "@/components/filing/filing-period-shell";
 import {
   ReportEditor,
   type SerializedMatchingPlan,
   type SerializedReport,
 } from "@/components/reports/report-editor";
-import { getPlanItemTitle } from "@/lib/plans/item-title";
+import { DeleteReportButton } from "@/components/reports/delete-report-button";
 import { requireSession } from "@/lib/auth";
-import { getDictionary } from "@/lib/i18n/get-dictionary";
-import { getLocale } from "@/lib/i18n/get-locale";
+import { getPlanItemTitle } from "@/lib/plans/item-title";
+import { getPlanForPeriod } from "@/lib/plans/queries";
 import { getReportEntryTitle } from "@/lib/reports/entry-title";
-import { getReportById, getSubmittedPlanForReport } from "@/lib/reports/queries";
+import {
+  getReportById,
+  getSubmittedPlanForReport,
+} from "@/lib/reports/queries";
 import { removeMechanicallyCopiedDailyEntries } from "@/lib/reports/create-draft";
 import {
   addDays,
@@ -136,22 +138,35 @@ export default async function ReportEditorPage({ params }: PageProps) {
     editorReport.periodStart,
   );
 
+  const planForPeriod = await getPlanForPeriod(
+    session.user.id,
+    session.user.organizationId,
+    editorReport.type,
+    editorReport.periodStart,
+  );
+
   const matchingPlan = submittedPlan
     ? serializeMatchingPlan(submittedPlan)
     : null;
 
-  const locale = await getLocale();
-  const dict = getDictionary(locale);
-
   return (
-    <div className="space-y-4">
-      <Link
-        href="/"
-        className="inline-flex h-7 items-center rounded-lg px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        {dict.navEditor.backToHome}
-      </Link>
+    <FilingPeriodShell
+      periodType={editorReport.type}
+      periodStart={editorReport.periodStart.toISOString()}
+      periodEnd={editorReport.periodEnd.toISOString()}
+      periodEditable={canEditPeriod(
+        editorReport.type,
+        editorReport.periodStart,
+        editorReport.periodEnd,
+      )}
+      plan={planForPeriod ? { status: planForPeriod.status } : null}
+      report={{ status: editorReport.status }}
+      activeFiling="report"
+      headerActions={
+        <DeleteReportButton reportId={editorReport.id} variant="destructive" />
+      }
+    >
       <ReportEditor report={serializeReport(editorReport, matchingPlan)} />
-    </div>
+    </FilingPeriodShell>
   );
 }

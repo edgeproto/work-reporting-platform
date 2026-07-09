@@ -243,6 +243,8 @@ export type Dictionary = {
   };
   navEditor: {
     backToHome: string;
+    editingPlan: string;
+    editingReport: string;
   };
   admin: {
     usersTitle: string;
@@ -656,6 +658,8 @@ export const en: Dictionary = {
   },
   navEditor: {
     backToHome: "← Back to Home",
+    editingPlan: "Editing plan",
+    editingReport: "Editing report",
   },
   admin: {
     usersTitle: "User Management",

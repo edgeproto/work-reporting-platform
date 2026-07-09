@@ -12,12 +12,21 @@ import { cn } from "@/lib/utils";
 type FilingStatusStripProps = {
   plan: { status: string } | null | undefined;
   report: { status: string } | null | undefined;
+  activeFiling?: "plan" | "report";
   className?: string;
 };
+
+function stripSectionClass(active: boolean) {
+  return cn(
+    "flex items-center gap-2 rounded-md px-1.5 py-0.5",
+    active && "bg-background ring-1 ring-primary/30",
+  );
+}
 
 export function FilingStatusStrip({
   plan,
   report,
+  activeFiling,
   className,
 }: FilingStatusStripProps) {
   const dict = useDictionary();
@@ -30,7 +39,7 @@ export function FilingStatusStrip({
       )}
       role="status"
     >
-      <div className="flex items-center gap-2">
+      <div className={stripSectionClass(activeFiling === "plan")}>
         <span className="text-xs font-semibold text-foreground">
           {dict.common.plan}
         </span>
@@ -46,7 +55,7 @@ export function FilingStatusStrip({
           <FilingMissingBadge />
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className={stripSectionClass(activeFiling === "report")}>
         <span className="text-xs font-semibold text-foreground">
           {dict.common.report}
         </span>

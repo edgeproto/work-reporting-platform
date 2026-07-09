@@ -1,16 +1,16 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DeletePlanButton } from "@/components/plans/delete-plan-button";
 import {
   PlanEditor,
   type SerializedPlan,
 } from "@/components/plans/plan-editor";
+import { FilingPeriodShell } from "@/components/filing/filing-period-shell";
 import { requireSession } from "@/lib/auth";
-import { getDictionary } from "@/lib/i18n/get-dictionary";
-import { getLocale } from "@/lib/i18n/get-locale";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { getPlanById } from "@/lib/plans/queries";
 import { canEditPeriod } from "@/lib/periods";
+import { getReportForPeriod } from "@/lib/reports/queries";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -57,18 +57,27 @@ export default async function PlanEditorPage({ params }: PageProps) {
     notFound();
   }
 
-  const locale = await getLocale();
-  const dict = getDictionary(locale);
+  const reportForPeriod = await getReportForPeriod(
+    session.user.id,
+    session.user.organizationId,
+    plan.type,
+    plan.periodStart,
+  );
 
   return (
-    <div className="space-y-4">
-      <Link
-        href="/"
-        className="inline-flex h-7 items-center rounded-lg px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        {dict.navEditor.backToHome}
-      </Link>
+    <FilingPeriodShell
+      periodType={plan.type}
+      periodStart={plan.periodStart.toISOString()}
+      periodEnd={plan.periodEnd.toISOString()}
+      periodEditable={canEditPeriod(plan.type, plan.periodStart, plan.periodEnd)}
+      plan={{ status: plan.status }}
+      report={reportForPeriod ? { status: reportForPeriod.status } : null}
+      activeFiling="plan"
+      headerActions={
+        <DeletePlanButton planId={plan.id} variant="destructive" />
+      }
+    >
       <PlanEditor plan={serializePlan(plan)} />
-    </div>
+    </FilingPeriodShell>
   );
 }

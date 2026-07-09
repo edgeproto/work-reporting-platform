@@ -18,7 +18,6 @@ import {
 import { DeleteReportButton } from "@/components/reports/delete-report-button";
 import { PlanItemOutcomeBadge } from "@/components/plans/plan-badges";
 import {
-  ReportStatusBadge,
   VisibilityBadge,
 } from "@/components/reports/report-badges";
 import { Button } from "@/components/ui/button";
@@ -34,11 +33,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { useDictionary, useI18n } from "@/components/i18n-provider";
+import { useDictionary } from "@/components/i18n-provider";
 import { formatMessage } from "@/lib/i18n/format";
+import { filingInnerCardClassName } from "@/lib/filing/action-meta";
 import { formatFileSize } from "@/lib/i18n/format-file-size";
-import { periodTypeLabel } from "@/lib/i18n/period-labels";
-import { formatPeriodLabel } from "@/lib/periods";
 
 export type SerializedPlanItem = {
   id: string;
@@ -92,18 +90,9 @@ type ReportEditorProps = {
 };
 
 export function ReportEditor({ report }: ReportEditorProps) {
-  const { locale } = useI18n();
   const dict = useDictionary();
   const isEditable =
     report.status === SubmissionStatus.DRAFT && report.periodEditable;
-  const periodLabel = formatPeriodLabel(
-    report.type,
-    new Date(report.periodStart),
-    new Date(report.periodEnd),
-    undefined,
-    locale,
-    dict.periods,
-  );
 
   const entriesByPlanItemId = new Map(
     report.entries
@@ -131,31 +120,17 @@ export function ReportEditor({ report }: ReportEditorProps) {
     : dict.reports.unplannedEmpty;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {formatMessage(dict.reports.title, {
-              type: periodTypeLabel(report.type, dict),
-            })}
-          </h1>
-          <p className="text-muted-foreground">{periodLabel}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ReportStatusBadge status={report.status} />
-          {totalHours > 0 ? (
-            <span className="text-sm text-muted-foreground">
-              {formatMessage(dict.reports.totalHours, {
-                hours: totalHours.toFixed(1),
-              })}
-            </span>
-          ) : null}
-          <DeleteReportButton reportId={report.id} variant="destructive" />
-        </div>
-      </div>
+    <div className="space-y-4">
+      {totalHours > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {formatMessage(dict.reports.totalHours, {
+            hours: totalHours.toFixed(1),
+          })}
+        </p>
+      ) : null}
 
       {report.matchingPlan ? (
-        <Card>
+        <Card className={filingInnerCardClassName}>
           <CardHeader>
             <CardTitle>{dict.reports.fromPlanTitle}</CardTitle>
             <CardDescription>{dict.reports.fromPlanDescription}</CardDescription>
@@ -198,7 +173,7 @@ export function ReportEditor({ report }: ReportEditorProps) {
         </p>
       )}
 
-      <Card>
+      <Card className={filingInnerCardClassName}>
         <CardHeader>
           <CardTitle>{entriesSectionTitle}</CardTitle>
           <CardDescription>{entriesSectionDescription}</CardDescription>
@@ -856,7 +831,7 @@ function ReportActions({
     const planItemCount = matchingPlan?.items.length ?? 0;
 
     return (
-      <Card>
+      <Card className={filingInnerCardClassName}>
         <CardContent className="space-y-4 pt-6">
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <Lock className="size-4" />
@@ -890,7 +865,7 @@ function ReportActions({
 
   if (!periodEditable) {
     return (
-      <Card>
+      <Card className={filingInnerCardClassName}>
         <CardContent className="flex items-center gap-2 pt-6 text-sm text-muted-foreground">
           <Lock className="size-4" />
           {dict.reports.draftOutsideWindow}
@@ -900,7 +875,7 @@ function ReportActions({
   }
 
   return (
-    <Card>
+    <Card className={filingInnerCardClassName}>
       <CardFooter className="flex flex-wrap items-center justify-between gap-4 border-t-0 bg-transparent">
         <p className="text-sm text-muted-foreground">
           {!hasEntries

@@ -19,7 +19,7 @@ import {
   itemHasMoreLines,
   useExpandableItems,
 } from "@/components/feed/expandable-lines";
-import { useDictionary } from "@/components/i18n-provider";
+import { useDictionary, useI18n } from "@/components/i18n-provider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WeekPicker } from "@/components/plans/week-picker";
@@ -35,18 +35,21 @@ import type {
   MemberRosterRow,
 } from "@/lib/dashboard/types";
 import { filingStatusFromTimestamps } from "@/lib/filing/status";
+import { filingSectionClassName } from "@/lib/filing/action-meta";
 import { formatMessage } from "@/lib/i18n/format";
 import { periodPickerLabel, periodTypeLabel } from "@/lib/i18n/period-labels";
 import {
   monthInputToReferenceDate,
   pickerValueFromReferenceDate,
 } from "@/lib/periods";
+import { cn } from "@/lib/utils";
 
 type MemberRosterProps = {
   rows: MemberRosterRow[];
   filters: DashboardFilters;
   roleLabels: Record<string, string>;
   showChangeTimestamps: boolean;
+  timeZone: string;
 };
 
 function buildParams(
@@ -126,11 +129,14 @@ function RosterFilingBadge({
 function FilingTimestampFooter({
   timestamps,
   show,
+  timeZone,
 }: {
   timestamps: FilingTimestamps | null;
   show: boolean;
+  timeZone: string;
 }) {
   const dict = useDictionary();
+  const { locale } = useI18n();
 
   if (!show || !timestamps) {
     return null;
@@ -138,9 +144,12 @@ function FilingTimestampFooter({
 
   const submittedAt = timestamps.submittedAt;
   const submitted = submittedAt
-    ? formatDashboardTimestamp(submittedAt)
+    ? formatDashboardTimestamp(submittedAt, { locale, timeZone })
     : null;
-  const updated = formatDashboardTimestamp(timestamps.updatedAt);
+  const updated = formatDashboardTimestamp(timestamps.updatedAt, {
+    locale,
+    timeZone,
+  });
   const changedAfterSubmit =
     submittedAt != null &&
     new Date(timestamps.updatedAt).getTime() >
@@ -252,6 +261,7 @@ export function MemberRosterTable({
   filters,
   roleLabels,
   showChangeTimestamps,
+  timeZone,
 }: MemberRosterProps) {
   const dict = useDictionary();
   const qs = buildParams(filters);
@@ -352,13 +362,12 @@ export function MemberRosterTable({
                       {roleLabels[row.role] ?? row.role}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="mb-2">
+                      <div className={cn(filingSectionClassName, "space-y-2")}>
                         <RosterFilingBadge
                           timestamps={row.planTimestamps}
                           kind="plan"
                         />
-                      </div>
-                      <ExpandableLineList
+                        <ExpandableLineList
                         lines={row.planLines}
                         expanded={expanded}
                         emptyLabel={dict.dashboard.noPlanFiled}
@@ -373,19 +382,20 @@ export function MemberRosterTable({
                           </div>
                         )}
                       />
-                      <FilingTimestampFooter
-                        timestamps={row.planTimestamps}
-                        show={showChangeTimestamps}
-                      />
+                        <FilingTimestampFooter
+                          timestamps={row.planTimestamps}
+                          show={showChangeTimestamps}
+                          timeZone={timeZone}
+                        />
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="mb-2">
+                      <div className={cn(filingSectionClassName, "space-y-2")}>
                         <RosterFilingBadge
                           timestamps={row.reportTimestamps}
                           kind="report"
                         />
-                      </div>
-                      <ExpandableLineList
+                        <ExpandableLineList
                         lines={row.reportLines}
                         expanded={expanded}
                         emptyLabel={dict.dashboard.noReportFiled}
@@ -402,10 +412,12 @@ export function MemberRosterTable({
                           </div>
                         )}
                       />
-                      <FilingTimestampFooter
-                        timestamps={row.reportTimestamps}
-                        show={showChangeTimestamps}
-                      />
+                        <FilingTimestampFooter
+                          timestamps={row.reportTimestamps}
+                          show={showChangeTimestamps}
+                          timeZone={timeZone}
+                        />
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {row.completionPct == null

@@ -66,6 +66,27 @@ export async function getReportById(
   });
 }
 
+export async function getReportForPeriod(
+  userId: string,
+  organizationId: string,
+  type: PeriodType,
+  periodStart: Date,
+) {
+  return db.report.findUnique({
+    where: {
+      userId_type_periodStart: {
+        userId,
+        type,
+        periodStart,
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+    },
+  });
+}
+
 /** Submitted plan for the same user, type, and period — used for report check-off. */
 export async function getSubmittedPlanForReport(
   userId: string,

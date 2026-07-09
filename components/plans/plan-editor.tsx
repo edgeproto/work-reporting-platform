@@ -15,8 +15,7 @@ import {
   updatePlanItemAction,
   uploadPlanItemAttachmentAction,
 } from "@/app/(dashboard)/my-plans/actions";
-import { PlanStatusBadge, VisibilityBadge } from "@/components/plans/plan-badges";
-import { DeletePlanButton } from "@/components/plans/delete-plan-button";
+import { VisibilityBadge } from "@/components/plans/plan-badges";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,11 +29,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { useDictionary, useI18n } from "@/components/i18n-provider";
+import { useDictionary } from "@/components/i18n-provider";
 import { formatMessage } from "@/lib/i18n/format";
+import { filingInnerCardClassName } from "@/lib/filing/action-meta";
 import { formatFileSize } from "@/lib/i18n/format-file-size";
-import { periodTypeLabel } from "@/lib/i18n/period-labels";
-import { formatPeriodLabel } from "@/lib/periods";
 
 export type SerializedPlanAttachment = {
   id: string;
@@ -69,46 +67,22 @@ type PlanEditorProps = {
 
 export function PlanEditor({ plan }: PlanEditorProps) {
   const router = useRouter();
-  const { locale } = useI18n();
   const dict = useDictionary();
   const isDraft = plan.status === SubmissionStatus.DRAFT;
   const isSubmitted = plan.status === SubmissionStatus.SUBMITTED;
   const canAddItems = isDraft && plan.periodEditable;
   const canEditItems =
     plan.periodEditable && (isDraft || isSubmitted);
-  const periodLabel = formatPeriodLabel(
-    plan.type,
-    new Date(plan.periodStart),
-    new Date(plan.periodEnd),
-    undefined,
-    locale,
-    dict.periods,
-  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {formatMessage(dict.plans.title, {
-              type: periodTypeLabel(plan.type, dict),
-            })}
-          </h1>
-          <p className="text-muted-foreground">{periodLabel}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <PlanStatusBadge status={plan.status} />
-          <DeletePlanButton planId={plan.id} variant="destructive" />
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {!plan.periodEditable ? (
         <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
           {dict.plans.outsideEditWindow}
         </p>
       ) : null}
 
-      <Card>
+      <Card className={filingInnerCardClassName}>
         <CardHeader>
           <CardTitle>{dict.plans.itemsTitle}</CardTitle>
           <CardDescription>{dict.plans.itemsDescription}</CardDescription>
@@ -642,7 +616,7 @@ function PlanActions({
 
   if (status === SubmissionStatus.SUBMITTED) {
     return (
-      <Card>
+      <Card className={filingInnerCardClassName}>
         <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Lock className="size-4" />
@@ -666,7 +640,7 @@ function PlanActions({
 
   if (!periodEditable) {
     return (
-      <Card>
+      <Card className={filingInnerCardClassName}>
         <CardContent className="flex items-center gap-2 pt-6 text-sm text-muted-foreground">
           <Lock className="size-4" />
           {dict.plans.draftOutsideWindow}
@@ -676,7 +650,7 @@ function PlanActions({
   }
 
   return (
-    <Card>
+    <Card className="border bg-background/70 shadow-none">
       <CardFooter className="flex flex-wrap items-center justify-between gap-4 border-t-0 bg-transparent">
         <p className="text-sm text-muted-foreground">
           {canSubmit ? dict.plans.submitReady : dict.plans.submitNeedItems}

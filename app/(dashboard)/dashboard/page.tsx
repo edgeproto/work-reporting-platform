@@ -9,7 +9,7 @@ import {
 } from "@/lib/dashboard/filters";
 import { fetchMemberRoster } from "@/lib/dashboard/queries";
 import { isManagerOrAbove } from "@/lib/rbac";
-import { formatPeriodLabel } from "@/lib/periods";
+import { formatPeriodLabel, getOrgTimezone } from "@/lib/periods";
 import { formatMessage } from "@/lib/i18n/format";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { getLocale } from "@/lib/i18n/get-locale";
@@ -64,6 +64,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           filters={filters}
           roleLabels={dict.roles}
           showChangeTimestamps={isManagerOrAbove(viewer)}
+          timeZone={getOrgTimezone()}
         />
       </section>
     </div>

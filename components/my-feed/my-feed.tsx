@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 
 import { PlanItemOutcome } from "@/app/generated/prisma/enums";
@@ -11,6 +10,8 @@ import {
   itemHasMoreLines,
   useExpandableItems,
 } from "@/components/feed/expandable-lines";
+import { FilingActionLink } from "@/components/filing/filing-action-link";
+import { FilingSection } from "@/components/filing/filing-section";
 import { FilingStatusStrip } from "@/components/filing/filing-status-strip";
 import { useDictionary } from "@/components/i18n-provider";
 import { PlanItemOutcomeBadge, VisibilityBadge } from "@/components/plans/plan-badges";
@@ -21,6 +22,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  planViewActionMeta,
+  reportViewActionMeta,
+} from "@/lib/filing/action-meta";
 import { feedCardAccentClass } from "@/lib/filing/status";
 import { formatMessage } from "@/lib/i18n/format";
 import type { FeedPeriodCard, MyFeedData } from "@/lib/my-feed/types";
@@ -43,6 +48,8 @@ function FeedCard({
   const planLineCount = card.plan?.lines.length ?? 0;
   const reportLineCount = card.report?.lines.length ?? 0;
   const canExpand = itemHasMoreLines(planLineCount, reportLineCount);
+  const planAction = planViewActionMeta(card.plan, dict);
+  const reportAction = reportViewActionMeta(card.report, dict);
 
   return (
     <Card className={cn(feedCardAccentClass(card.plan, card.report))}>
@@ -62,85 +69,93 @@ function FeedCard({
           />
         ) : null}
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {dict.common.plan}
-          </p>
-          {card.plan ? (
-            <div className="space-y-2">
-              {card.plan.lines.length > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {formatMessage(dict.feed.completed, {
-                    completed: card.plan.completedCount,
-                    total: card.plan.lines.length,
-                  })}
-                </p>
-              ) : null}
-              <ExpandableLineList
-                lines={card.plan.lines}
-                expanded={expanded}
-                emptyLabel={dict.feed.noPlanItems}
-                lineKey={(line, index) => `${line.title}-${index}`}
-                renderLine={(line) => (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="truncate">{line.title}</span>
-                    <VisibilityBadge visibility={line.visibility} />
-                    {line.outcome !== PlanItemOutcome.OPEN ? (
-                      <PlanItemOutcomeBadge outcome={line.outcome} />
-                    ) : null}
-                  </div>
-                )}
-              />
-              <Link
+      <CardContent className="grid gap-3 text-sm">
+        {card.plan ? (
+          <FilingSection title={dict.common.plan}>
+            {card.plan.lines.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {formatMessage(dict.feed.completed, {
+                  completed: card.plan.completedCount,
+                  total: card.plan.lines.length,
+                })}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">{dict.feed.noPlanItems}</p>
+            )}
+            <ExpandableLineList
+              lines={card.plan.lines}
+              expanded={expanded}
+              emptyLabel={dict.feed.noPlanItems}
+              lineKey={(line, index) => `${line.title}-${index}`}
+              renderLine={(line) => (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="truncate">{line.title}</span>
+                  <VisibilityBadge visibility={line.visibility} />
+                  {line.outcome !== PlanItemOutcome.OPEN ? (
+                    <PlanItemOutcomeBadge outcome={line.outcome} />
+                  ) : null}
+                </div>
+              )}
+            />
+            {planAction ? (
+              <FilingActionLink
                 href={`/my-plans/${card.plan.id}`}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                {dict.feed.openPlan}
-              </Link>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {dict.common.report}
-          </p>
-          {card.report ? (
-            <div className="space-y-2">
-              {card.report.lines.length > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {formatMessage(dict.feed.hoursShort, {
-                    hours: card.report.totalHours.toFixed(1),
-                  })}
-                </p>
-              ) : null}
-              <ExpandableLineList
-                lines={card.report.lines}
-                expanded={expanded}
-                emptyLabel={dict.feed.noReportEntries}
-                lineKey={(line, index) => `${line.title}-${index}`}
-                renderLine={(line) => (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="truncate">{line.title}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatMessage(dict.feed.hoursShort, {
-                        hours: line.hours.toFixed(1),
-                      })}
-                    </span>
-                    <VisibilityBadge visibility={line.visibility} />
-                  </div>
-                )}
+                kind="plan"
+                meta={planAction}
               />
-              <Link
+            ) : null}
+          </FilingSection>
+        ) : (
+          <FilingSection title={dict.common.plan}>
+            <p className="text-xs text-muted-foreground">{dict.feed.noPlanItems}</p>
+          </FilingSection>
+        )}
+
+        {card.report ? (
+          <FilingSection title={dict.common.report}>
+            {card.report.lines.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {formatMessage(dict.feed.hoursShort, {
+                  hours: card.report.totalHours.toFixed(1),
+                })}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {dict.feed.noReportEntries}
+              </p>
+            )}
+            <ExpandableLineList
+              lines={card.report.lines}
+              expanded={expanded}
+              emptyLabel={dict.feed.noReportEntries}
+              lineKey={(line, index) => `${line.title}-${index}`}
+              renderLine={(line) => (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="truncate">{line.title}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatMessage(dict.feed.hoursShort, {
+                      hours: line.hours.toFixed(1),
+                    })}
+                  </span>
+                  <VisibilityBadge visibility={line.visibility} />
+                </div>
+              )}
+            />
+            {reportAction ? (
+              <FilingActionLink
                 href={`/my-reports/${card.report.id}`}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                {dict.feed.openReport}
-              </Link>
-            </div>
-          ) : null}
-        </div>
+                kind="report"
+                meta={reportAction}
+              />
+            ) : null}
+          </FilingSection>
+        ) : (
+          <FilingSection title={dict.common.report}>
+            <p className="text-xs text-muted-foreground">
+              {dict.feed.noReportEntries}
+            </p>
+          </FilingSection>
+        )}
       </CardContent>
     </Card>
   );
