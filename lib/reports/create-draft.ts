@@ -1,15 +1,34 @@
 import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { deleteAttachmentsForReportEntry } from "@/lib/reports/attachments";
+
+function entryCopyKey(entry: {
+  taskTitleId: string | null;
+  customTitle: string | null;
+  description: string | null;
+  hours: { toString(): string } | number | string;
+  visibility: string;
+}): string {
+  const hours = Number(entry.hours).toFixed(2);
+  return [
+    entry.taskTitleId ?? "",
+    entry.customTitle ?? "",
+    entry.description ?? "",
+    hours,
+    entry.visibility,
+  ].join("\0");
+}
 
 /**
- * Copy entries from submitted daily reports within the weekly/monthly period
- * into an empty draft report. Mechanical copy — one row per daily entry.
+ * Remove report entries that were mechanically copied from submitted daily
+ * reports (legacy prefill). Only touches unplanned entries on weekly/monthly
+ * drafts that exactly match a daily entry in the same period.
  */
-export async function prefillWeeklyMonthlyReportFromDailyEntries(
+export async function removeMechanicallyCopiedDailyEntries(
   reportId: string,
   userId: string,
   organizationId: string,
-) {
+): Promise<{ removedCount: number }> {
   const report = await db.report.findFirst({
     where: { id: reportId, userId, organizationId },
   });
@@ -19,12 +38,7 @@ export async function prefillWeeklyMonthlyReportFromDailyEntries(
     report.type === PeriodType.DAILY ||
     report.status !== SubmissionStatus.DRAFT
   ) {
-    return { prefilledCount: 0 };
-  }
-
-  const existingCount = await db.reportEntry.count({ where: { reportId } });
-  if (existingCount > 0) {
-    return { prefilledCount: 0 };
+    return { removedCount: 0 };
   }
 
   const dailyReports = await db.report.findMany({
@@ -39,34 +53,48 @@ export async function prefillWeeklyMonthlyReportFromDailyEntries(
       },
     },
     include: {
-      entries: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      },
+      entries: true,
     },
-    orderBy: { periodStart: "asc" },
   });
 
-  const entriesToCreate = dailyReports.flatMap((dailyReport) =>
-    dailyReport.entries.map((entry) => ({
-      reportId,
-      taskTitleId: entry.taskTitleId,
-      customTitle: entry.customTitle,
-      description: entry.description,
-      hours: entry.hours,
-      visibility: entry.visibility,
-    })),
+  const copiedKeys = new Set(
+    dailyReports.flatMap((dailyReport) =>
+      dailyReport.entries.map((entry) => entryCopyKey(entry)),
+    ),
   );
 
-  if (entriesToCreate.length === 0) {
-    return { prefilledCount: 0 };
+  if (copiedKeys.size === 0) {
+    return { removedCount: 0 };
   }
 
-  await db.reportEntry.createMany({
-    data: entriesToCreate.map((entry, index) => ({
-      ...entry,
-      sortOrder: index,
-    })),
+  const draftEntries = await db.reportEntry.findMany({
+    where: {
+      reportId,
+      planItemId: null,
+    },
   });
 
-  return { prefilledCount: entriesToCreate.length };
+  const entriesToRemove = draftEntries.filter((entry) =>
+    copiedKeys.has(entryCopyKey(entry)),
+  );
+
+  if (entriesToRemove.length === 0) {
+    return { removedCount: 0 };
+  }
+
+  for (const entry of entriesToRemove) {
+    await deleteAttachmentsForReportEntry(
+      organizationId,
+      reportId,
+      entry.id,
+    );
+    await db.reportEntry.delete({ where: { id: entry.id } });
+  }
+
+  await db.report.update({
+    where: { id: reportId },
+    data: { updatedAt: new Date() },
+  });
+
+  return { removedCount: entriesToRemove.length };
 }

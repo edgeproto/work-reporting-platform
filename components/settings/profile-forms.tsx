@@ -59,14 +59,25 @@ function AvatarCard({
     FormData
   >(uploadAvatarAction, {});
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [clientError, setClientError] = useState<string | null>(null);
   const [isRemoving, startRemove] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const maxAvatarBytes = 2 * 1024 * 1024;
 
   useEffect(() => {
     if (state.success) {
       router.refresh();
     }
   }, [state.success, router]);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    setClientError(null);
+    const file = fileRef.current?.files?.[0];
+    if (file && file.size > maxAvatarBytes) {
+      event.preventDefault();
+      setClientError("Avatar must be 2 MB or smaller.");
+    }
+  };
 
   return (
     <Card>
@@ -89,7 +100,11 @@ function AvatarCard({
             <span>?</span>
           )}
         </div>
-        <form action={formAction} className="flex flex-wrap items-center gap-2">
+        <form
+          action={formAction}
+          onSubmit={handleSubmit}
+          className="flex flex-wrap items-center gap-2"
+        >
           <Input
             ref={fileRef}
             type="file"
@@ -97,6 +112,7 @@ function AvatarCard({
             accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
             className="max-w-xs"
             required
+            onChange={() => setClientError(null)}
           />
           <Button type="submit" disabled={pending}>
             {pending ? "Uploading…" : "Upload"}
@@ -121,6 +137,9 @@ function AvatarCard({
           >
             {isRemoving ? "Removing…" : "Remove"}
           </Button>
+        ) : null}
+        {clientError ? (
+          <p className="w-full text-sm text-destructive">{clientError}</p>
         ) : null}
         {state.error ? (
           <p className="w-full text-sm text-destructive">{state.error}</p>

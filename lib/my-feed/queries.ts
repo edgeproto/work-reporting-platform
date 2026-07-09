@@ -2,32 +2,19 @@ import { PeriodType, SubmissionStatus } from "@/app/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { isPlanItemCompleted } from "@/lib/plans/outcome";
+import type {
+  FeedPeriodCard,
+  FeedPlanFiling,
+  FeedReportFiling,
+  MyFeedData,
+} from "@/lib/my-feed/types";
+import { getReportEntryTitle } from "@/lib/reports/entry-title";
 import {
   addDays,
   formatDateInTz,
   formatPeriodLabel,
   getPeriodBounds,
 } from "@/lib/periods";
-
-export type FeedFiling = {
-  id: string;
-  status: "draft" | "submitted";
-  summary: string;
-};
-
-export type FeedPeriodCard = {
-  type: PeriodType;
-  referenceDate: string;
-  periodLabel: string;
-  heading: string;
-  plan: FeedFiling | null;
-  report: FeedFiling | null;
-};
-
-export type MyFeedData = {
-  daily: FeedPeriodCard[];
-  weekly: FeedPeriodCard[];
-};
 
 function lastDailyReferences(count: number): string[] {
   const today = formatDateInTz(new Date());
@@ -130,40 +117,47 @@ async function loadFeedCard(
     }),
   ]);
 
+  let planFiling: FeedPlanFiling | null = null;
+  if (plan) {
+    const lines = plan.items.map((item) => ({
+      title: getPlanItemTitle(item),
+      visibility: item.visibility,
+      outcome: item.outcome,
+    }));
+    planFiling = {
+      id: plan.id,
+      status:
+        plan.status === SubmissionStatus.SUBMITTED ? "submitted" : "draft",
+      lines,
+      completedCount: plan.items.filter((item) =>
+        isPlanItemCompleted(item.outcome),
+      ).length,
+    };
+  }
+
+  let reportFiling: FeedReportFiling | null = null;
+  if (report) {
+    const lines = report.entries.map((entry) => ({
+      title: getReportEntryTitle(entry),
+      hours: Number(entry.hours) || 0,
+      visibility: entry.visibility,
+    }));
+    reportFiling = {
+      id: report.id,
+      status:
+        report.status === SubmissionStatus.SUBMITTED ? "submitted" : "draft",
+      lines,
+      totalHours: lines.reduce((sum, line) => sum + line.hours, 0),
+    };
+  }
+
   return {
     type,
     referenceDate,
     periodLabel,
     heading,
-    plan: plan
-      ? {
-          id: plan.id,
-          status:
-            plan.status === SubmissionStatus.SUBMITTED ? "submitted" : "draft",
-          summary:
-            plan.items.length === 0
-              ? "No items"
-              : `${plan.items.filter((item) => isPlanItemCompleted(item.outcome)).length}/${plan.items.length} completed · ${plan.items
-                  .slice(0, 2)
-                  .map((item) => getPlanItemTitle(item))
-                  .join(", ")}${plan.items.length > 2 ? "…" : ""}`,
-        }
-      : null,
-    report: report
-      ? {
-          id: report.id,
-          status:
-            report.status === SubmissionStatus.SUBMITTED
-              ? "submitted"
-              : "draft",
-          summary:
-            report.entries.length === 0
-              ? "No entries"
-              : `${report.entries.length} entries · ${report.entries
-                  .reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0)
-                  .toFixed(1)} h`,
-        }
-      : null,
+    plan: planFiling,
+    report: reportFiling,
   };
 }
 
@@ -178,7 +172,7 @@ export async function loadMyFeedData(
       ),
     ),
     Promise.all(
-      lastWeeklyReferences(4).map((referenceDate) =>
+      lastWeeklyReferences(5).map((referenceDate) =>
         loadFeedCard(userId, organizationId, PeriodType.WEEKLY, referenceDate),
       ),
     ),
@@ -186,3 +180,5 @@ export async function loadMyFeedData(
 
   return { daily, weekly };
 }
+
+export type { FeedPeriodCard, MyFeedData } from "@/lib/my-feed/types";

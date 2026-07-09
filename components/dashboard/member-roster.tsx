@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { ChevronDown, ChevronRight, MoreHorizontal } from "lucide-react";
 
-import { PeriodType } from "@/app/generated/prisma/enums";
+import { PeriodType, PlanItemOutcome } from "@/app/generated/prisma/enums";
 import { VisibilityBadge, PlanItemOutcomeBadge } from "@/components/plans/plan-badges";
-import { PlanItemOutcome } from "@/app/generated/prisma/enums";
+import {
+  ExpandableLineList,
+  ExpandAllToggleButton,
+  ExpandMoreButton,
+  itemHasMoreLines,
+  useExpandableItems,
+} from "@/components/feed/expandable-lines";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,8 +35,6 @@ import {
   periodTypeLabel,
   pickerValueFromReferenceDate,
 } from "@/lib/periods";
-
-const INITIAL_LINES = 4;
 
 type MemberRosterProps = {
   rows: MemberRosterRow[];
@@ -117,37 +120,6 @@ function FilingTimestampFooter({
     <div className="mt-2 space-y-0.5 border-t pt-2 text-xs text-muted-foreground">
       {submitted ? <p>Submitted {submitted}</p> : null}
       {changedAfterSubmit ? <p>Last changed {updated}</p> : null}
-    </div>
-  );
-}
-
-function LineList<T extends RosterPlanLine | RosterReportLine>({
-  lines,
-  expanded,
-  renderLine,
-  emptyLabel,
-}: {
-  lines: T[];
-  expanded: boolean;
-  renderLine: (line: T, index: number) => React.ReactNode;
-  emptyLabel: string;
-}) {
-  if (lines.length === 0) {
-    return <p className="text-muted-foreground">{emptyLabel}</p>;
-  }
-
-  const visible = expanded ? lines : lines.slice(0, INITIAL_LINES);
-  const hasMore = lines.length > INITIAL_LINES;
-
-  return (
-    <div className="space-y-1">
-      <ul className="space-y-1">{visible.map((line, i) => renderLine(line, i))}</ul>
-      {!expanded && hasMore ? (
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <MoreHorizontal className="size-3.5" aria-hidden />
-          <span>{lines.length - INITIAL_LINES} more</span>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -243,66 +215,25 @@ export function MemberRosterTable({
   showChangeTimestamps,
 }: MemberRosterProps) {
   const qs = buildParams(filters);
-  const [expandAll, setExpandAll] = useState(false);
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const rowIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const { expandAll, isExpanded, toggleItem, toggleExpandAll } =
+    useExpandableItems(rowIds);
 
   const anyExpandable = useMemo(
     () =>
-      rows.some(
-        (row) =>
-          row.planLines.length > INITIAL_LINES ||
-          row.reportLines.length > INITIAL_LINES,
+      rows.some((row) =>
+        itemHasMoreLines(row.planLines.length, row.reportLines.length),
       ),
     [rows],
   );
 
-  const isRowExpanded = (rowId: string) =>
-    expandAll || expandedRows.has(rowId);
-
-  const toggleRow = (rowId: string) => {
-    if (expandAll) {
-      setExpandAll(false);
-      setExpandedRows(new Set(rows.map((r) => r.id).filter((id) => id !== rowId)));
-      return;
-    }
-    setExpandedRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(rowId)) {
-        next.delete(rowId);
-      } else {
-        next.add(rowId);
-      }
-      return next;
-    });
-  };
-
   return (
     <div className="space-y-3">
       {anyExpandable ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setExpandAll(true);
-              setExpandedRows(new Set());
-            }}
-          >
-            Expand all
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setExpandAll(false);
-              setExpandedRows(new Set());
-            }}
-          >
-            Collapse all
-          </Button>
-        </div>
+        <ExpandAllToggleButton
+          expandAll={expandAll}
+          onToggle={toggleExpandAll}
+        />
       ) : null}
 
       <div className="overflow-x-auto rounded-lg border">
@@ -340,29 +271,21 @@ export function MemberRosterTable({
               </tr>
             ) : (
               rows.map((row) => {
-                const expanded = isRowExpanded(row.id);
-                const canExpand =
-                  row.planLines.length > INITIAL_LINES ||
-                  row.reportLines.length > INITIAL_LINES;
+                const expanded = isExpanded(row.id);
+                const canExpand = itemHasMoreLines(
+                  row.planLines.length,
+                  row.reportLines.length,
+                );
 
                 return (
                   <tr key={row.id} className="align-top hover:bg-muted/30">
                     <td className="px-2 py-3">
                       {canExpand ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => toggleRow(row.id)}
-                          aria-label={expanded ? "Collapse row" : "Expand row"}
-                          aria-expanded={expanded}
-                        >
-                          {expanded ? (
-                            <ChevronDown className="size-4" />
-                          ) : (
-                            <ChevronRight className="size-4" />
-                          )}
-                        </Button>
+                        <ExpandMoreButton
+                          expanded={expanded}
+                          onToggle={() => toggleItem(row.id)}
+                          label={row.name}
+                        />
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
@@ -377,21 +300,19 @@ export function MemberRosterTable({
                       {roleLabels[row.role] ?? row.role}
                     </td>
                     <td className="px-4 py-3">
-                      <LineList
+                      <ExpandableLineList
                         lines={row.planLines}
                         expanded={expanded}
                         emptyLabel="No plan filed."
-                        renderLine={(line, index) => (
-                          <li
-                            key={`${line.title}-${index}`}
-                            className="flex flex-wrap items-center gap-1.5"
-                          >
+                        lineKey={(line, index) => `${line.title}-${index}`}
+                        renderLine={(line) => (
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span className="truncate">{line.title}</span>
                             <VisibilityBadge visibility={line.visibility} />
                             {line.outcome !== PlanItemOutcome.OPEN ? (
                               <PlanItemOutcomeBadge outcome={line.outcome} />
                             ) : null}
-                          </li>
+                          </div>
                         )}
                       />
                       <FilingTimestampFooter
@@ -400,21 +321,19 @@ export function MemberRosterTable({
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <LineList
+                      <ExpandableLineList
                         lines={row.reportLines}
                         expanded={expanded}
                         emptyLabel="No report filed."
-                        renderLine={(line, index) => (
-                          <li
-                            key={`${line.title}-${index}`}
-                            className="flex flex-wrap items-center gap-1.5"
-                          >
+                        lineKey={(line, index) => `${line.title}-${index}`}
+                        renderLine={(line) => (
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span className="truncate">{line.title}</span>
                             <span className="text-xs text-muted-foreground">
                               {line.hours.toFixed(1)} h
                             </span>
                             <VisibilityBadge visibility={line.visibility} />
-                          </li>
+                          </div>
                         )}
                       />
                       <FilingTimestampFooter

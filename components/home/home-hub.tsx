@@ -156,34 +156,11 @@ function PeriodSection({
     });
   };
 
-  const planButtonLabel = (() => {
-    if (!section.editable && canViewPlan) {
-      return "View plan";
-    }
-    if (planMissing) {
-      return "Submit plan";
-    }
-    if (planDraft) {
-      return "Edit plan";
-    }
-    return "View plan";
-  })();
+  const planButtonLabel =
+    planMissing && section.editable ? "Submit plan" : "View plan";
 
-  const reportButtonLabel = (() => {
-    if (!section.editable && canViewReport) {
-      return "View report";
-    }
-    if (reportSubmitted) {
-      return "View report";
-    }
-    if (reportMissing) {
-      return "Submit report";
-    }
-    if (reportDraft) {
-      return "Edit report";
-    }
-    return "View report";
-  })();
+  const reportButtonLabel =
+    reportMissing && section.editable ? "Submit report" : "View report";
 
   const showPlanAction = canSubmitOrEditPlan || canViewPlan;
   const showReportAction =

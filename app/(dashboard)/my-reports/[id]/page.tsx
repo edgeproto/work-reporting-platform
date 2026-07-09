@@ -12,6 +12,7 @@ import { getPlanItemTitle } from "@/lib/plans/item-title";
 import { requireSession } from "@/lib/auth";
 import { getReportEntryTitle } from "@/lib/reports/entry-title";
 import { getReportById, getSubmittedPlanForReport } from "@/lib/reports/queries";
+import { removeMechanicallyCopiedDailyEntries } from "@/lib/reports/create-draft";
 import {
   addDays,
   canEditPeriod,
@@ -108,11 +109,29 @@ export default async function ReportEditorPage({ params }: PageProps) {
     notFound();
   }
 
+  if (
+    report.type !== PeriodType.DAILY &&
+    report.status === SubmissionStatus.DRAFT
+  ) {
+    await removeMechanicallyCopiedDailyEntries(
+      id,
+      session.user.id,
+      session.user.organizationId,
+    );
+  }
+
+  const editorReport =
+    report.type !== PeriodType.DAILY &&
+    report.status === SubmissionStatus.DRAFT
+      ? ((await getReportById(id, session.user.id, session.user.organizationId)) ??
+        report)
+      : report;
+
   const submittedPlan = await getSubmittedPlanForReport(
     session.user.id,
     session.user.organizationId,
-    report.type,
-    report.periodStart,
+    editorReport.type,
+    editorReport.periodStart,
   );
 
   const matchingPlan = submittedPlan
@@ -127,7 +146,7 @@ export default async function ReportEditorPage({ params }: PageProps) {
       >
         ← Back to Home
       </Link>
-      <ReportEditor report={serializeReport(report, matchingPlan)} />
+      <ReportEditor report={serializeReport(editorReport, matchingPlan)} />
     </div>
   );
 }

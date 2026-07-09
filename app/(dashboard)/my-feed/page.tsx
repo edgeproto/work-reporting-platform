@@ -21,7 +21,7 @@ export default async function MyFeedPage() {
           {dict.nav.myFeed}
         </h1>
         <p className="text-muted-foreground">
-          Your recent daily and weekly filings at a glance.
+          Your recent daily and weekly filings side by side.
         </p>
       </div>
       <MyFeed data={data} />
